@@ -1,3 +1,0 @@
-/home/salif/project/build/CMakeFiles/rebuild_cache.dir
-/home/salif/project/build/CMakeFiles/ConvexHull.dir
-/home/salif/project/build/CMakeFiles/edit_cache.dir
