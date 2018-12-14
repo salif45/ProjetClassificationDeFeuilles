@@ -1,0 +1,21 @@
+git clone https://github.com/Kitware/CMake.git
+git clone https://github.com/DGtal-team/DGtal.git
+
+cd cmake 
+./bootstrap
+make
+cd ..
+
+cd DGtal
+mkdir build
+cd build
+../../CMake/bin/cmake ..
+make
+cd ../..
+
+cd project
+mkdir build
+cd build
+../../CMake/bin/cmake ..
+make 
+cd ..

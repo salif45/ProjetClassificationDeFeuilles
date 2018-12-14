@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=gnu++11  -rdynamic CMakeFiles/ConvexHull.dir/main.cpp.o  -o ConvexHull  -L/home/salif/DGtal/build/src -Wl,-rpath,/home/salif/DGtal/build/src /home/salif/DGtal/build/src/libDGtal.so -lboost_program_options -lz -lrt 
