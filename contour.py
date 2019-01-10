@@ -303,9 +303,9 @@ def etude_classificateur(convexite, dents, jsonPath):
     return listeResultat
 
 def main():
-    input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
+    # input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
     # input = cv2.imread("base_donnee_feuille/hetre/hetre2.jpg")
-    # input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
+    input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
     # input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
@@ -351,11 +351,11 @@ def main():
     #(plus precis que regarder les distance centre-bord mais plus long a calculer)
 
     listeDiametre = np.array([])
-    for i in range(int(len(contourUtile)/6)):
-        point = contourUtile[i+3][0]
+    for i in range(int(len(contourUtile)/8)):
+        point = contourUtile[i+4][0]
         pX, pY = point
         vPointCentre = [cX - pX, cY - pY]
-        x, p2 = trouverPointContour([cX,cY], vPointCentre, 1, 0.02, 20, contourUtile, input)
+        x, p2 = trouverPointContour([cX,cY], vPointCentre, 1, 0.02, 25, contourUtile, input)
         d = dist(point, p2)
         listeDiametre = np.append(listeDiametre, d)
 
@@ -400,7 +400,7 @@ def main():
     listeDistPerp = np.array([])
     #On parcours le grand axe et on mesure les longueurs sur a peu pres tout l'axe (on ignore les extremites
     # car les feuilles rectangulaires le sont vers le centre)
-    #Si la feuille est entre 0 et 10, on va regarder entre 2 et 8 pour enlever la pointe
+    #EX : Si la feuille est entre 0 et 10, on va regarder entre 2 et 8 pour enlever la pointe
     for i in range(0,41):
         pourcent = 0.20 + i*0.015
         pDepart = [float(pointGrandAxe1[0]) + pourcent * vecGrandAxe[0],
@@ -430,15 +430,17 @@ def main():
 
     p=dist(pointGrandAxe1, pointGrandAxe2) #longueur grand axe
     q=dist(pointPetitAxe1,pointPetitAxe2) #longueur petit axe
-    print("grd {}, petit {}".format(p,q))
+
     #On regarde si c'est un carre (petit grand axe = grand axe +-10%):
     if (p*0.9<=q)and(q>=p*1.1):
         print "c'est un carre"
+
 
     #On regarde si c'est une ellipse
     c=((p/2.0)**2-(q/2.0)**2)**0.5
     #calcul des foyers
     vGrandAxeNorm= np.array(vecGrandAxe)
+
     vGrandAxeNorm = vGrandAxeNorm / np.linalg.norm(vGrandAxeNorm)
     foyer1 = [int(centreGrandAxe[0] + c * vGrandAxeNorm[0]),
               int(centreGrandAxe[1] + c * vGrandAxeNorm[1])]
@@ -450,6 +452,8 @@ def main():
     cv2.circle(input, tuple(foyer1), 7, [200, 200, 0], -1)
     cv2.circle(input, tuple(foyer2), 7, [200, 200, 0], -1)
     #Ellipse si en tout point du contour : distance(foyer1-contour)+distance(foyer2-contour) = cte
+
+
     listeDistanceEllipse = np.array([])
     for i in range(len(contourUtile)):
         pt=contourUtile[i][0]
@@ -458,9 +462,61 @@ def main():
         dtot=d1+d2
         listeDistanceEllipse = np.append(listeDistanceEllipse, dtot)
 
-    print("somme dist moyenne std : {}".format(listeDistanceEllipse.std()))
-    if listeDistanceEllipse.std() < 30 :
+    #On peut regarder aussi si petit et grd axe sont axes de symetrie
+    p1 = [int(float(pointGrandAxe1[0]) + 0.2 * vecGrandAxe[0]),
+          int(float(pointGrandAxe1[1]) + 0.2 * vecGrandAxe[1])]
+    p2 = [int(float(pointGrandAxe1[0]) + 0.8 * vecGrandAxe[0]),
+          int(float(pointGrandAxe1[1]) + 0.8 * vecGrandAxe[1])]
+    vecPetitAxe=[pointPetitAxe2[0]-pointPetitAxe1[0],pointPetitAxe2[1]-pointPetitAxe1[1]]
+    p3 = [int(float(pointPetitAxe1[0]) + 0.2 * vecPetitAxe[0]),
+          int(float(pointPetitAxe1[1]) + 0.2 * vecPetitAxe[1])]
+    p4 = [int(float(pointPetitAxe1[0]) + 0.8 * vecPetitAxe[0]),
+          int(float(pointPetitAxe1[1]) + 0.8 * vecPetitAxe[1])]
+    cv2.circle(input, tuple(p1), 7, [0, 200, 200], -1)
+    cv2.circle(input, tuple(p2), 7, [0, 200, 200], -1)
+    cv2.circle(input, tuple(p3), 7, [0, 200, 200], -1)
+    cv2.circle(input, tuple(p4), 7, [0, 200, 200], -1)
+
+    #on cherche les points sur le bord pour calcul les distances pour les comparer et regarder s'il y a symetrie
+    x, s1a = trouverPointContour(p1, vecPetitAxe, -1, 0.01, 10, contourUtile, input)
+    x, s1b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtile, input)
+    x, s2a = trouverPointContour(p2, vecPetitAxe, -1, 0.01, 10, contourUtile, input)
+    x, s2b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtile, input)
+    x, s3a = trouverPointContour(p3, vecGrandAxe, -1, 0.01, 10, contourUtile, input)
+    x, s3b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtile, input)
+    x, s4a = trouverPointContour(p4, vecGrandAxe, -1, 0.01, 10, contourUtile, input)
+    x, s4b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtile, input)
+
+    l1 = dist(s1a,s1b)
+    l2 = dist(s2a, s2b)
+    l3 = dist(s3a, s3b)
+    l4 = dist(s4a, s4b)
+
+    #Parfois la detection de point pose probleme car la fonction detecte 2 points au meme endroit si la largeur de la feuille est faible
+    #Ce qui donne une distance nulle
+    #On calcule le rapport r=l1/l2 sauf si l1 et/ou l2=0
+    #On suppose que si les 2 longueur du rapport sont nuls alors la feuille est fine des 2 cotes => r=1
+    #Si (l2 =0 et l1!=0)=> r=0 pour eviter les divisions par 0
+    if (l1<1 and l2<1):
+        r1=1
+    elif (l2 == 0): #eviter la division par 0
+        r1=0
+    else :
+        r1 = l1/l2
+
+    if (l1<1 and l2<1):
+        r2=1
+    elif (l4 == 0):
+        r2=0
+    else :
+        r2 = l3/l4
+    print("ellipse test symetrie : rapport1 = {}, rapport2 {}".format(r1, r2))
+    print("ellipse std : {}".format(listeDistanceEllipse.std()))
+    #Si les longueurs sont proches et qu'on a une symetrie (approximatoin, on a pas des formes parfaites)
+    if (listeDistanceEllipse.std() < 30) and (0.8<=r1 and r1 <= 1.2) and (0.8<=r2 and r2<=1.2) :
         print "!!!!!!!! c'est une ellipse"
+
+
 
     cv2.imshow("point loin", input)
 
@@ -484,6 +540,7 @@ def main():
 
     #detection convexite :
     convexite= feuille_convexe(thresh, input)
+    print("convexe : {}".format(convexite))
 
     listeResultat = etude_classificateur(convexite, dents, 'arbre.json')
     print(listeResultat)
