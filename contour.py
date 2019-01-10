@@ -17,16 +17,8 @@ def calcAngle(a,b,c):
     angle = np.arccos(np.dot(vecBA, vecBC)) * 180 / pi
     return angle
 
-def detection_dent(segmentation, imageDeBase):
+def detection_dent(contourUtile, imageDeBase ):
     dent = imageDeBase.copy();
-
-    contours, hierarchy = cv2.findContours(segmentation, 1, cv2.CHAIN_APPROX_TC89_KCOS)
-    # methode d'approximation (dernier argument : maybe CHAIN_APPROX_TC89_L1 resultats proches )
-    #on considere que le contours de la feuille est le contour le plus long :
-
-    contourUtile = max(contours, key=len)
-    # cv2.drawContours(imageDeBase, contourUtile, -1, (0,0,255), 2)
-    # cv2.imshow("contour utilise", segmentation)
 
     list_contour = [] #pour stocker les points qui sont consideres comme des dents
     #on parcourt tous les points du contour et on regarde s'ils sont a peu pres alignes
@@ -54,13 +46,8 @@ def detection_dent(segmentation, imageDeBase):
     return presenceDent
 
 
-def feuille_convexe(segmentation, imageDeBase):
-    contours, hierarchy = cv2.findContours(segmentation, 1, cv2.CHAIN_APPROX_TC89_KCOS)
-    # on considere que le contours de la feuille est le contour le plus long :
-    contourUtile = max(contours, key=len)
+def feuille_convexe(contourUtile, hull, imageDeBase):
 
-    #On recupere le contour convexe de notre feuille
-    hull = cv2.convexHull(contourUtile, returnPoints=False)
     #On recupere les defauts de convexite de notre contour
     defects = cv2.convexityDefects(contourUtile, hull)
     defautDetecte=0;
@@ -109,44 +96,36 @@ def masqueSansQueue(segmentation):
     masque2 = cv2.morphologyEx(masque2, cv2.MORPH_CLOSE, kernel)
     # On seuille le masque
     ret, masquethresh = cv2.threshold(masque2, 127, 255, 0)
+    contours, hierarchy = cv2.findContours(masquethresh, 1, cv2.CHAIN_APPROX_SIMPLE)
+    contourUtile = max(contours, key=len)
+    contourConvex = cv2.convexHull(contourUtile)
+    M = cv2.moments(contourConvex)
+    cX = int(M["m10"] / M["m00"])
+    cY = int(M["m01"] / M["m00"])
+    centre = [cX, cY]
 
-    return masquethresh
+    return masquethresh, contourUtile, contourConvex, centre
 
 #Fonction pour determiner si la feuille est en forme de triangle
 #TODO : ATTENTION ca ne marche que pour les feuille convexe car on utilie le vrai contour de la feuille pas le contour convexe
-def checkTriangle(masqueSansQueue, input):
+def checkTriangle(input, contourUtile, contourConvex, centre):
     compteurdetriangle = 0
 
     height, width, channels = input.shape
-
-    # On recupere le contour du masque
-    contours, hierarchy = cv2.findContours(masqueSansQueue, 1, cv2.CHAIN_APPROX_SIMPLE)
-    contourUtile = max(contours, key=len)
-    # on recupere le contour convexe
-    hull = cv2.convexHull(contourUtile)
-    # cv2.drawContours(input, contourUtile, -1, (255, 0, 0), 2)
-    # cv2.imshow("contour utilise", input)
-
-    # On determine le 'centre' de la feuille
-    M = cv2.moments(hull)
-    cX = int(M["m10"] / M["m00"])
-    cY = int(M["m01"] / M["m00"])
-    # cv2.circle(input, (cX, cY), 5, [0, 2, 255], -1)
-
-
+    cX, cY = centre
 
     #Avec le contour convex on calcul les angle en chaque point :
     listeAngle = np.array([])
-    for i in range(len(hull) - 1):
-        a = hull[i - 1][0]
-        b = hull[i][0]
-        c = hull[i + 1][0]
+    for i in range(len(contourConvex) - 1):
+        a = contourConvex[i - 1][0]
+        b = contourConvex[i][0]
+        c = contourConvex[i + 1][0]
         angle = calcAngle(a, b, c)
         listeAngle = np.append(listeAngle, angle)
         # calcul de l'angle : avant-dernier,dernier,premier point du contour
-    a = hull[len(hull) - 2][0]
-    b = hull[len(hull) - 1][0]
-    c = hull[0][0]
+    a = contourConvex[len(contourConvex) - 2][0]
+    b = contourConvex[len(contourConvex) - 1][0]
+    c = contourConvex[0][0]
     angle = calcAngle(a, b, c)
     listeAngle = np.append(listeAngle, angle)
 
@@ -155,7 +134,7 @@ def checkTriangle(masqueSansQueue, input):
     for i in range(len(listeAngle)):
         if listeAngle[i] < 140:
             # cv2.circle(input, tuple(hull[i][0]), 5, [0, 2, 255], -1)
-            listeAngleFaible.append(hull[i][0])
+            listeAngleFaible.append(contourConvex[i][0])
             # cv2.imshow("sommets possible detectes", input)
     # print("il y a {} sommets detectes".format(len(listeAngleFaible)))
 
@@ -183,7 +162,7 @@ def checkTriangle(masqueSansQueue, input):
         #Choix de 2 points base et sommet pour calculer la largeur a ces 2 endroits
         #Si le rapport est assez grand on considere qu'on a un triangle
 
-        pDepart, baseEnd = trouverPointContour(pointAngle, vecSommetCentre, 1, 0.01, 5, contourUtile, input)
+        pDepart, baseEnd = trouverPointContour(pointAngle, vecSommetCentre, 1, 0.01, 5, contourUtile, height, width)
 
         # cv2.circle(input, tuple([int(baseEnd[0]), int(baseEnd[1])]), 5, [255, 0, 0], -1)
         # cv2.circle(input, tuple([int(pointAngle[0]), int(pointAngle[1])]), 5, [0, 0, 255], -1)
@@ -197,25 +176,20 @@ def checkTriangle(masqueSansQueue, input):
         # cv2.circle(input, tuple([int(sommet[0]),int(sommet[1])]), 5, [255, 2, 255], -1)
         # cv2.imshow("triangle", input)
 
-
         #pas avec lequel on parcours la perpendiculaire a la recherche de point du sommet dans cette direction
         pas=0.02
         #distance max pour conciderer qu'on est assez proche d'un point
         seuil = 7
-        pDepart, sommetGauche = trouverPointContour(sommet, vecPerpendiculaire, 1, pas, seuil, contourUtile, input)
-
+        pDepart, sommetGauche = trouverPointContour(sommet, vecPerpendiculaire, 1, pas, seuil, contourUtile, height, width)
         # print("fin triangle 1/4")
 
-        x, sommetDroit = trouverPointContour(sommet, vecPerpendiculaire, -1, pas, seuil, contourUtile, input)
-
+        x, sommetDroit = trouverPointContour(sommet, vecPerpendiculaire, -1, pas, seuil, contourUtile, height, width)
         # print("fin triangle 2/4")
 
-        x, baseGauche = trouverPointContour(base, vecPerpendiculaire, 1, pas, seuil, contourUtile, input)
-
+        x, baseGauche = trouverPointContour(base, vecPerpendiculaire, 1, pas, seuil, contourUtile, height, width)
         # print("fin triangle 3/4")
 
-        x, baseDroit = trouverPointContour(base, vecPerpendiculaire, -1, pas, seuil, contourUtile, input)
-
+        x, baseDroit = trouverPointContour(base, vecPerpendiculaire, -1, pas, seuil, contourUtile, height, width)
         # print("fin triangle 4/4")
 
         rapport = dist(baseDroit, baseGauche) / dist(sommetDroit, sommetGauche)
@@ -227,9 +201,22 @@ def checkTriangle(masqueSansQueue, input):
         cv2.imshow("triangle", input)
     return compteurdetriangle
 
-def trouverPointContour(pDepart, vecteur, direction, pas, seuil, contour, input):
 
-    height, width, channels = input.shape
+## trouverPointContour ##
+#Determiner le point du contour le plus proche dans une certaine direction (intersection contour/segment)
+#Parametre :
+    #pDepart : point de depart d'ou on part pour chercher le point
+    #vecteur : vecteur directeur pour la direction dans laquelle on cherche le point
+    #direction : 1 ou -1 : (si on veux aller dnas la direction opposee du vecteur)
+    #pas : vitesse a laquelle on s'eloigne du depart
+    #seuil : eloignement max du point par rapport au vecteur plus c'est petit plus ca sera precis mais on peut se retrouver avec une boucle infini si c'es trop grand
+    #contour : contour ou on veut trouver le point
+    #input : image
+#Retour :
+    #pDepart2 : je ne sais pas si c'est utile : parfois l'algo doit decaller le point de depart pour converger => retourne ce nouveau point de departt
+    #pointOutput : Point d'intersection
+def trouverPointContour(pDepart, vecteur, direction, pas, seuil, contour, height, width):
+    # height, width, channels = input.shape
     enCours = True
     baseD = copy.deepcopy(pDepart)
     pDepart2 = copy.deepcopy(pDepart)
@@ -253,8 +240,34 @@ def trouverPointContour(pDepart, vecteur, direction, pas, seuil, contour, input)
                     enCours = False
     # cv2.circle(input, tuple([int(pointOutput[0]), int(pointOutput[1])]), 5, [255,255,255], -1)
 
-    return (pDepart2,pointOutput)
+    return pDepart2,pointOutput
 
+#methode cercle :
+    #la feuille est supposee symetrique
+    #On parcours la moitie des points et 1 point sur 4 (d'ou le /8 et le i+4)
+    #Pour chaque point on cherche celui en face par rapport au centre
+    #On mesure la distance entre les 2 points opposes
+    #On regarde si c'est constant
+    #(plus precis que regarder les distance centre-bord mais plus long a calculer)
+def checkCercle(contourUtile, centre, input):
+    cX, cY = centre
+    cercle = False
+    height, width, channels = input.shape
+    listeDiametre = np.array([])
+    for i in range(int(len(contourUtile) / 8)):
+        point = contourUtile[i + 4][0]
+        pX, pY = point
+        vPointCentre = [cX - pX, cY - pY]
+        x, p2 = trouverPointContour([cX, cY], vPointCentre, 1, 0.02, 25, contourUtile, height, width)
+        d = dist(point, p2)
+        listeDiametre = np.append(listeDiametre, d)
+
+    print("cercle : ecart type des diametres : {}".format(listeDiametre.std()))
+    if (listeDiametre.std() < 15):  # 20 : valeur a ajuster
+        print("!!!! cercle")
+        cercle = True
+
+    return cercle
 
 
 def redimension(imageDeBase):
@@ -278,7 +291,12 @@ def segmentation(input): #TODO : mettre la bonne segmentation
     opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
 
     ret, thresh = cv2.threshold(opening, 127, 255, 0)
-    return thresh
+
+    ## Pour eviter de recalculer les contours regulierement :
+    contours, hierarchy = cv2.findContours(thresh, 1, cv2.CHAIN_APPROX_TC89_KCOS)
+    contourFeuille = max(contours, key=len)
+    contourConvex = cv2.convexHull(contourFeuille, returnPoints=False)
+    return thresh, contourFeuille, contourConvex
 
 
 def etude_classificateur(convexite, dents, jsonPath):
@@ -315,62 +333,27 @@ def main():
 
     input = redimension(input)
 
-    thresh = segmentation(input)
+    thresh, contourUtileBase, contourConvexBase = segmentation(input)
+
+    height, width, channels = input.shape
 
     #Retirer la queue et avoir un masque utilisable pour determiner la forme
-    masquethresh = masqueSansQueue(thresh)
+    masquethresh, contourUtileMasque, contourConvexMasque, centreMasque = masqueSansQueue(thresh)
 
     #TODO : Ameliorer la detection de cercle
 
-
-    #On recupere le contour du masque
-    contours, hierarchy = cv2.findContours(masquethresh, 1, cv2.CHAIN_APPROX_SIMPLE)
-    contourUtile = max(contours, key=len)
-    #on recupere le contour convexe
-    hull = cv2.convexHull(contourUtile)
-    cv2.drawContours(input, contourUtile, -1, (255,0,0), 2)
-    cv2.imshow("contour utilise", input)
+    cX, cY = centreMasque
 
     #TODO : Etudier la forme a partir du masque sans la queue
-    #centre de la feuille
-    M = cv2.moments(hull)
-    cX = int(M["m10"] / M["m00"])
-    cY = int(M["m01"] / M["m00"])
-    cv2.circle(input, (cX,cY), 5, [0, 2,255], -1)
-    # cv2.imshow("centre", input)
 
     ## Detection d'une elipse/rectangle
-
-
-    #methode cercle :
-    #la feuille est supposee symetrique
-    #On parcours la moitie des points et 1 point sur 3 (d'ou le /6 et le i+3)
-    #Pour chaque point on charge celui en face pa rapport au centre
-    #On mesure la distance entre les 2 points opposes
-    #On regarde si c'est constant
-    #(plus precis que regarder les distance centre-bord mais plus long a calculer)
-
-    listeDiametre = np.array([])
-    for i in range(int(len(contourUtile)/8)):
-        point = contourUtile[i+4][0]
-        pX, pY = point
-        vPointCentre = [cX - pX, cY - pY]
-        x, p2 = trouverPointContour([cX,cY], vPointCentre, 1, 0.02, 25, contourUtile, input)
-        d = dist(point, p2)
-        listeDiametre = np.append(listeDiametre, d)
-
-
-    print("ecart type des diametres : {}".format(listeDiametre.std()))
-    if (listeDiametre.std() < 15):  # 20 : valeur a ajuster
-        print("!!!! cercle")
-
 
 
     #methode rectangle :
     #Calcul distance centre -> contour :
     listeDistanceCentreContour = np.array([])
-    for i in range(len(contourUtile)):
-        point = contourUtile[i][0]
+    for i in range(len(contourUtileMasque)):
+        point = contourUtileMasque[i][0]
         pX, pY = point
         distance = ((cX-pX)**2+(cY-pY)**2)**0.5
         listeDistanceCentreContour = np.append(listeDistanceCentreContour,distance)
@@ -378,18 +361,18 @@ def main():
 
     #On cherche le grand axe
     indiceGrandAxe1 = listeDistanceCentreContour.argmax() #le point le plus loin du centre
-    pointGrandAxe1 = contourUtile[indiceGrandAxe1][0]
+    pointGrandAxe1 = contourUtileMasque[indiceGrandAxe1][0]
     cv2.circle(input, tuple(pointGrandAxe1), 7, [100,100,100], -1)
 
     #le point de l'autre cote -> celui qui a la plus grande distance avec lui
     dMax = -1
-    for i in range(len(contourUtile)):
-        point = contourUtile[i][0]
+    for i in range(len(contourUtileMasque)):
+        point = contourUtileMasque[i][0]
         pX, pY = point
         distance = dist(pointGrandAxe1, [pX,pY])
         if distance > dMax :
             dMax = distance
-            pointGrandAxe2 = contourUtile[i][0]
+            pointGrandAxe2 = contourUtileMasque[i][0]
 
     cv2.circle(input, tuple(pointGrandAxe2), 7, [100,100,100], -1)
 
@@ -405,8 +388,8 @@ def main():
         pourcent = 0.20 + i*0.015
         pDepart = [float(pointGrandAxe1[0]) + pourcent * vecGrandAxe[0],
                    float(pointGrandAxe1[1]) + pourcent * vecGrandAxe[1]]
-        x, sommetA = trouverPointContour(pDepart, vecPerpGrandAxe, 1, pas, seuil, contourUtile, input)
-        x, sommetB = trouverPointContour(pDepart, vecPerpGrandAxe, -1, pas, seuil, contourUtile, input)
+        x, sommetA = trouverPointContour(pDepart, vecPerpGrandAxe, 1, pas, seuil, contourUtileMasque, height, width)
+        x, sommetB = trouverPointContour(pDepart, vecPerpGrandAxe, -1, pas, seuil, contourUtileMasque, height, width)
         d = dist(sommetA, sommetB)
         listeDistPerp = np.append(listeDistPerp, d)
 
@@ -422,8 +405,8 @@ def main():
     #Demi grand axe : On va au centre du grand axe et on cherche les points
     centreGrandAxe=[float(pointGrandAxe1[0]) + 0.5 * vecGrandAxe[0],
                     float(pointGrandAxe1[1]) + 0.5 * vecGrandAxe[1]]
-    x, pointPetitAxe1 = trouverPointContour(centreGrandAxe, vecPerpGrandAxe, 1, pas, seuil, contourUtile, input)
-    x, pointPetitAxe2 = trouverPointContour(centreGrandAxe, vecPerpGrandAxe, -1, pas, seuil, contourUtile, input)
+    x, pointPetitAxe1 = trouverPointContour(centreGrandAxe, vecPerpGrandAxe, 1, pas, seuil, contourUtileMasque, height, width)
+    x, pointPetitAxe2 = trouverPointContour(centreGrandAxe, vecPerpGrandAxe, -1, pas, seuil, contourUtileMasque, height, width)
     cv2.circle(input, tuple(pointPetitAxe1), 7, [200,200,200], -1)
     cv2.circle(input, tuple(pointPetitAxe2), 7, [200,200,200], -1)
 
@@ -455,8 +438,8 @@ def main():
 
 
     listeDistanceEllipse = np.array([])
-    for i in range(len(contourUtile)):
-        pt=contourUtile[i][0]
+    for i in range(len(contourUtileMasque)):
+        pt=contourUtileMasque[i][0]
         d1 = dist(pt,foyer1)
         d2 = dist(pt,foyer2)
         dtot=d1+d2
@@ -478,14 +461,14 @@ def main():
     cv2.circle(input, tuple(p4), 7, [0, 200, 200], -1)
 
     #on cherche les points sur le bord pour calcul les distances pour les comparer et regarder s'il y a symetrie
-    x, s1a = trouverPointContour(p1, vecPetitAxe, -1, 0.01, 10, contourUtile, input)
-    x, s1b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtile, input)
-    x, s2a = trouverPointContour(p2, vecPetitAxe, -1, 0.01, 10, contourUtile, input)
-    x, s2b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtile, input)
-    x, s3a = trouverPointContour(p3, vecGrandAxe, -1, 0.01, 10, contourUtile, input)
-    x, s3b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtile, input)
-    x, s4a = trouverPointContour(p4, vecGrandAxe, -1, 0.01, 10, contourUtile, input)
-    x, s4b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtile, input)
+    x, s1a = trouverPointContour(p1, vecPetitAxe, -1, 0.01, 10, contourUtileMasque, height, width)
+    x, s1b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtileMasque, height, width)
+    x, s2a = trouverPointContour(p2, vecPetitAxe, -1, 0.01, 10, contourUtileMasque, height, width)
+    x, s2b = trouverPointContour(x, vecPetitAxe, 1, 0.01, 10, contourUtileMasque, height, width)
+    x, s3a = trouverPointContour(p3, vecGrandAxe, -1, 0.01, 10, contourUtileMasque, height, width)
+    x, s3b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtileMasque, height, width)
+    x, s4a = trouverPointContour(p4, vecGrandAxe, -1, 0.01, 10, contourUtileMasque, height, width)
+    x, s4b = trouverPointContour(x, vecGrandAxe, 1, 0.01, 10, contourUtileMasque, height, width)
 
     l1 = dist(s1a,s1b)
     l2 = dist(s2a, s2b)
@@ -523,7 +506,7 @@ def main():
 
 
 
-
+    #TODO : regarder pour les feuille pas entiere si les bord sont pointu (platane) ou arrondi (chene)
 
 
 
@@ -531,16 +514,19 @@ def main():
 
 
     # Detection forme : triangle
-    nombreTriangle = checkTriangle(masquethresh, input)
+    nombreTriangle = checkTriangle(input, contourUtileMasque, contourConvexMasque, centreMasque)
     print("On a detecte {} triangle dans la forme".format(nombreTriangle))
-
+    # Detection forme : cercle
+    cercle = checkCercle(contourUtileMasque, centreMasque, input)
+    print("Forme cercle : {}".format(cercle))
 
     #detection dent :
-    dents = detection_dent(thresh, input)
+    dents = detection_dent(contourUtileBase, input)
+    print("presence de dent : {}".format(dents))
 
     #detection convexite :
-    convexite= feuille_convexe(thresh, input)
-    print("convexe : {}".format(convexite))
+    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input)
+    print("feuille entiere : {}".format(convexite))
 
     listeResultat = etude_classificateur(convexite, dents, 'arbre.json')
     print(listeResultat)
