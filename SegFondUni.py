@@ -1,37 +1,50 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-import glob as glob
 
 
-####### Gegmentatipon
-names = glob.glob("base_donnee_feuille/FondUni/*")
-# names = glob.glob("base_donnee_feuille/All/*")
 
-img = []
-img_seg = []
-for name in names:
+def __auto_canny(image, sigma=0.33): #By Adrian (www.pyimagesearch.com)
+    # compute the median of the single channel pixel intensities
+    v = np.median(image)
+
+    # apply automatic Canny edge detection using the computed median
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    edged = cv2.Canny(image, lower, upper)
+
+    # return the edged image
+    return edged
+
+def __open_resize_image (name):
     image = cv2.imread(name)
     height, width, channel = image.shape
-    while (width > 600 or height > 600):
+    if (width > 600 or height > 600):
         image = cv2.resize(image, (int(width / 3), int(height / 3)), interpolation=cv2.INTER_CUBIC)
-        height, width, channel = image.shape
-    img.append(image)
+    return image
 
-    ROI = cv2.selectROI(image)
+def __ROI_selector(image):
 
-    if ROI != (0, 0, 0, 0):
-        image = image[int(ROI[1]):int(ROI[1] + ROI[3]), int(ROI[0]):int(ROI[0] + ROI[2])]
+    if(cv2.__version__[0] == "3"): #OpenCV 3.XXX
+        ROI = cv2.selectROI(image)
+        if ROI != (0, 0, 0, 0):
+            image_roi = image[int(ROI[1]):int(ROI[1] + ROI[3]), int(ROI[0]):int(ROI[0] + ROI[2])]
+            coordinates = [int(ROI[1]), int(ROI[0])]
+        else:
+            image_roi = image
+            coordinates = [0, 0]
+    elif(cv2.__version__[0] == "2"): #OpenCV 2.XXX
+        image_roi = image
+        coordinates = [0, 0]
+
+
+    return image_roi, coordinates
+
+
+def FondUniSegmentation(image_path):
+    image = __open_resize_image(image_path)
+    image, top_left_coord = __ROI_selector(image)
     height, width, channel = image.shape
-
-    # ### Fond Naturel
-    # color_mean_row = np.average(image,axis=0)
-    # color_mean = np.average(color_mean_row,axis=0)
-    #
-    # print(color_mean)
-    # color = color_mean.argmax()
-    # print(color)
-
+    #Color treatement
     for i in range(0, height):
         for j in range(0, width):
             green = image[i, j, 1]
@@ -41,25 +54,14 @@ for name in names:
                 image[i, j, 0] = 0
                 image[i, j, 1] = 0
                 image[i, j, 2] = 0
+    #Smoothing the image
+    image = cv2.GaussianBlur(image, (3, 3), 0)
 
-    image = cv2.medianBlur(image,5)
+    image_Lab = cv2.cvtColor(image, cv2.COLOR_BGR2Lab)
+    #Morphological operation
+    kernel = np.ones((5, 5), np.uint8)
+    closing = cv2.morphologyEx(image_Lab, cv2.MORPH_CLOSE, kernel)
 
-    cv2.imshow('image',cv2.Canny(image,100,150))
+    img_seg = __auto_canny(closing)
 
-    image_HSV = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
-    H = image_HSV[:, :, 0]
-    S = image_HSV[:, :, 1]
-    V = image_HSV[:, :, 2]
-    cv2.imshow('imageHSV',cv2.Canny(image_HSV, 100, 150))
-    cv2.imshow('H',cv2.Canny(H, 100, 150))
-    # cv2.imshow('S',cv2.Canny(S, 100, 150))
-    # cv2.imshow('V',cv2.Canny(V, 100, 150))
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    #########  Test couleur verte  ############
-
-
-
-    ######################################
-
+    return img_seg
