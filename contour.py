@@ -260,19 +260,20 @@ def trouverPointContour(pDepart, vecteurDirecteur, contour, input, debug=False):
         #on stocke le premier point puis pour chaque point on compare aux points dans listeReduite
         #S'ils sont assez proche -> On fait la moyenne avec le point qui correspond histoire de decaller un peu le point stocke
         #Sinon -> on ajoute le point a la listeReduite
-        listeReduite = [listePoint[0]]
-        for i in range(1,len(listePoint)):
-            point = listePoint[i]
-            test = False
-            for j in range(len(listeReduite)):
-                d = dist(point, listeReduite[j])
-                if (d < 15 and (test == False)) :
-                    p=listeReduite[j]
-                    moyenne= [(p[0]+point[0])/2, (p[1]+point[1])/2]
-                    listeReduite[j]=moyenne
-                    test = True
-            if test == False : #Pour  ne pas ajouter un point a 2 groupes
-                listeReduite.append(point)
+        if (len(listePoint)>0):
+            listeReduite = [listePoint[0]]
+            for i in range(1,len(listePoint)):
+                point = listePoint[i]
+                test = False
+                for j in range(len(listeReduite)):
+                    d = dist(point, listeReduite[j])
+                    if (d < 15 and (test == False)) :
+                        p=listeReduite[j]
+                        moyenne= [(p[0]+point[0])/2, (p[1]+point[1])/2]
+                        listeReduite[j]=moyenne
+                        test = True
+                if test == False : #Pour  ne pas ajouter un point a 2 groupes
+                    listeReduite.append(point)
         #Si on n'a pas assez de valeur a la fin pour selectionner les points du contour, on augmente le seuil
         s+=0.1
 
@@ -555,17 +556,19 @@ def redimension(imageDeBase):
 
 def segmentation(input): #TODO : mettre la bonne segmentation
     image_gray = cv2.cvtColor(input, cv2.COLOR_RGB2GRAY)
+    cv2.imshow("gray",  image_gray)
     edges = cv2.Canny(image_gray, 100, 150)
 
     ret, thresh = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
+    cv2.imshow("thresh", thresh)
     kernel = np.ones((3, 3), np.uint8)
     opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
 
     ret, thresh = cv2.threshold(opening, 127, 255, 0)
 
     ## Pour eviter de recalculer les contours regulierement :
-    contours, hierarchy = cv2.findContours(thresh, 1, cv2.CHAIN_APPROX_TC89_KCOS)
+    thresh2 = copy.deepcopy(thresh)
+    contours, hierarchy = cv2.findContours(thresh2, 1, cv2.CHAIN_APPROX_TC89_KCOS)
     contourFeuille = max(contours, key=len)
     contourConvex = cv2.convexHull(contourFeuille, returnPoints=False)
     return thresh, contourFeuille, contourConvex
@@ -610,21 +613,24 @@ def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, 
     return listeResultat
 
 def main():
-    # input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
+    # input = cv2.imread("base_donnee_feuille/hetre/hetre5.jpg")
     # input = cv2.imread("base_donnee_feuille/hetre/hetre2.jpg")
     # input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
     # input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
     # input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
-    # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
+    input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau3.jpg")
     # input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
-    # input = cv2.imread("base_donnee_feuille/platane/pla tane2.jpg")
+    # input = cv2.imread("base_donnee_feuille/platane/platane4.jpg")
 
     input = redimension(input)
     cv2.imshow("feuille", input)
 
     thresh, contourUtileBase, contourConvexBase = segmentation(input)
+    cv2.imshow("treshmain", thresh)
+    for i in range(len(contourUtileBase)):
+        cv2.circle(input, tuple(contourUtileBase[i][0]), 2, [255, 0, 0], -1)
 
     #Retirer la queue et avoir un masque utilisable pour determiner la forme
     masquethresh, contourUtileMasque, contourConvexMasque, centreMasque = masqueSansQueue(thresh)
@@ -654,7 +660,7 @@ def main():
     carre = checkCarre(grandAxe1, grandAxe2, contourUtileMasque, input)
     print("Forme carre : {}".format(carre))
     # Detection forme : ellipse
-    ellipse = checkEllipse(grandAxe1, grandAxe2, contourUtileMasque, input)
+    ellipse = checkEllipse(grandAxe1, grandAxe2, contourUtileMasque, input, True)
     print("Forme ellipse : {}".format(ellipse))
 
     #detection dent :
