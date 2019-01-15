@@ -63,27 +63,31 @@ def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
         end = tuple(contourUtile[e][0])   #point du contours convexe d'apres
         far = tuple(contourUtile[f][0])   #defaut de convexite entre les deux
 
+        # on ne considere que les defauts de convexite qui forme un angle assez petit
         # calcul de l'angle
         angle = calcAngle(start, far, end)
+        # Il faut egalement un critere sur les longueur pour ne pas prendre en compte les dents de la feuille
+        d1, d2 = dist(start, far), dist(far, end)
 
         #affichage du contour convexe
         if debug == True :
             cv2.line(imageDeBase, start, end, [0, 255, 0], 2)
             cv2.circle(imageDeBase, start, 5, [0, 255, 0], -1)
             cv2.circle(imageDeBase, far, 5, [255, 0, 0], -1)
-            print("angle : {}".format(angle))
+            print("angle = {}".format(angle))
+            print("d1 = {} | d2 = {}".format(d1, d2))
 
 
 
-        #on ne considere que les defauts de convexite qui forme un angle assez petit
-        if (angle <115) :
+        if ((angle <120) and (d1>25 and d2>25)):
             defautDetecte += 1
             #affichage des defauts selectionnes
             if debug == True :
                 cv2.circle(imageDeBase, far, 5, [0, 0, 255], -1)
-    print("nb defaut = {}".format(defautDetecte))
+
+
     convex = False
-    if defautDetecte < 3:
+    if defautDetecte <= 4:
         convex = True
 
     if debug == True :
@@ -565,14 +569,13 @@ def etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, e
         nbrAttribus = len(cle[1])
         nbrPositif = 0
 
-        convexiteTheorique = cle[1].get("convexe")
-
         for cle2 in cle[1].items(): #On parcours les differents attrabuts et leurs valeurs
             if (cle2[0] == "convexe" and cle2[1] == convexite):
                 nbrPositif += 1
             if (cle2[0] == "dent" and cle2[1] == dents):
                 nbrPositif += 1
-            if (convexiteTheorique == True):
+            #on ne regarde la forme que si la feuille est entiere
+            if (convexite == True):
                 if (cle2[0] == "triangle" and cle2[1] == triangle):
                     nbrPositif += 1
                 if (cle2[0] == "cercle" and cle2[1] == cercle):
@@ -594,13 +597,13 @@ def main():
     # input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
     # input = cv2.imread("base_donnee_feuille/hetre/hetre2.jpg")
     # input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
-    input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
+    # input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
     # input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau3.jpg")
-    # input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
-
+    input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
+    # input = cv2.imread("base_donnee_feuille/platane/platane2.jpg")
 
     input = redimension(input)
     cv2.imshow("feuille", input)
@@ -639,7 +642,7 @@ def main():
     print("presence de dent : {}".format(dents))
 
     #detection convexite :
-    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input, True)
+    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input)
     print("feuille entiere : {}".format(convexite))
 
     listeResultat = etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, ellipse, 'arbre.json')
