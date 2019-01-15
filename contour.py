@@ -53,10 +53,12 @@ def detection_dent(contourUtile, imageDeBase, debug = False ):
 
 
 def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
-
+    convex, pointu = False, False
     #On recupere les defauts de convexite de notre contour
     defects = cv2.convexityDefects(contourUtile, hull)
-    defautDetecte=0;
+    defautDetecte = 0
+    pointeDetecte = 0
+
     for i in range(defects.shape[0]):
         s, e, f, d = defects[i, 0]
         start = tuple(contourUtile[s][0]) #point du contours convexe avant
@@ -64,7 +66,7 @@ def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
         far = tuple(contourUtile[f][0])   #defaut de convexite entre les deux
 
         # on ne considere que les defauts de convexite qui forme un angle assez petit
-        # calcul de l'angle
+        # calcul de l'angle avec le defaut de convexite
         angle = calcAngle(start, far, end)
         # Il faut egalement un critere sur les longueur pour ne pas prendre en compte les dents de la feuille
         d1, d2 = dist(start, far), dist(far, end)
@@ -81,20 +83,27 @@ def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
 
         if ((angle <120) and (d1>25 and d2>25)):
             defautDetecte += 1
-            #affichage des defauts selectionnes
+            #On regarde la forme de la pointe
+            if (s!=len(contourUtile)-1) : #eviter list index out of range
+                anglePointe = calcAngle(contourUtile[s - 1][0], contourUtile[s][0], contourUtile[s + 1][0])
+                if anglePointe<105:
+                    pointeDetecte+=1
             if debug == True :
-                cv2.circle(imageDeBase, far, 5, [0, 0, 255], -1)
+                cv2.circle(imageDeBase, start, 5, [0, 0, 255], -1) #pointe selectionnee
+                cv2.circle(imageDeBase, tuple(contourUtile[s-1][0]), 4, [255, 0, 255], -1)
+                cv2.circle(imageDeBase, tuple(contourUtile[s+1][0]), 4, [255, 0, 255], -1)
+                print("anglePointe = {}".format(anglePointe))
 
 
-    convex = False
     if defautDetecte <= 4:
         convex = True
+    if (convex==False and pointeDetecte>=3):
+        pointu = True
 
     if debug == True :
         cv2.imshow('feuille entiere', imageDeBase)
-        print("Feuille entiere : {}".format(convex))
 
-    return convex
+    return convex, pointu
 
 #Fonction pour determiner le masque de la feuille sans la queue afin de determiner la forme
 def masqueSansQueue(segmentation):
@@ -149,8 +158,6 @@ def checkTriangle(input, contourUtile, contourConvex, centre, debug = False):
     listeAngleFaible = []
     for i in range(len(listeAngle)):
         if listeAngle[i] < 140:
-            if debug==True :
-                cv2.circle(input, tuple(contourConvex[i][0]), 5, [0, 0, 255], -1)
             listeAngleFaible.append(contourConvex[i][0])
     if debug == True :
         print("il y a {} sommets detectes avant de reduire".format(len(listeAngleFaible)))
@@ -205,6 +212,8 @@ def checkTriangle(input, contourUtile, contourConvex, centre, debug = False):
             cv2.circle(input, tuple([int(pointAngle[0]), int(pointAngle[1])]), 5, [255, 0, 0], -1)
             cv2.circle(input, tuple([int(base[0]),int(base[1])]), 5, [255,0, 255], -1)
             cv2.circle(input, tuple([int(sommet[0]),int(sommet[1])]), 5, [255, 0, 255], -1)
+            cv2.line(input, tuple(sommetGauche), tuple(sommetDroit), [0, 255, 0], 1)
+            cv2.line(input, tuple(baseGauche), tuple(baseDroit), [0, 255, 0], 1)
             print("rapport = {}".format(rapport))
             cv2.imshow("triangle", input)
 
@@ -509,13 +518,19 @@ def checkEllipse(pointGrandAxe1, pointGrandAxe2, contourUtile, input, debug = Fa
         cv2.circle(input, tuple(pointGrandAxe2), 7, [0,0,255], -1)
         cv2.circle(input, tuple(pointPetitAxe1), 7, [0,0,255], -1)
         cv2.circle(input, tuple(pointPetitAxe2), 7, [0,0,255], -1)
-        cv2.circle(input, tuple(foyer1), 7, [0,0,170], -1)
-        cv2.circle(input, tuple(foyer2), 7, [0,0,170], -1)
+        cv2.line(input, tuple(pointGrandAxe1), tuple(pointGrandAxe2), [0, 0, 200], 1)
+        cv2.line(input, tuple(pointPetitAxe1), tuple(pointPetitAxe2), [0, 0, 200], 1)
+        cv2.circle(input, tuple(foyer1), 7, [170,0,170], -1)
+        cv2.circle(input, tuple(foyer2), 7, [170,0,170], -1)
         #Les points pour verifier la symetrie
         cv2.circle(input, tuple(p1), 7, [255,0,0], -1)
         cv2.circle(input, tuple(p2), 7, [255,0,0], -1)
         cv2.circle(input, tuple(p3), 7, [255,0,0], -1)
         cv2.circle(input, tuple(p4), 7, [255,0,0], -1)
+        cv2.line(input, tuple(p1a), tuple(p1b), [200,0,200], 1)
+        cv2.line(input, tuple(p2a), tuple(p2b), [200,0,200], 1)
+        cv2.line(input, tuple(p3a), tuple(p3b), [200, 0, 200], 1)
+        cv2.line(input, tuple(p4a), tuple(p4b), [200, 0, 200], 1)
         print("rapport pour symetrie: r1= {}, r2={}".format(r1,r2))
         print("std distance: {}".format(listeDistanceEllipse.std()))
         cv2.imshow("Ellipse", input)
@@ -556,7 +571,7 @@ def segmentation(input): #TODO : mettre la bonne segmentation
     return thresh, contourFeuille, contourConvex
 
 
-def etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, ellipse, jsonPath):
+def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, jsonPath):
     # ouverture du fichier JSON et mise sous forme de dictionnaire
     with open(jsonPath) as json_data:
         data_dict = json.load(json_data)
@@ -584,9 +599,10 @@ def etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, e
                     nbrPositif += 1
                 if (cle2[0] == "carre" and cle2[1] == carre):
                     nbrPositif += 1
-                    print("carre")
                 if (cle2[0] == "ellipse" and cle2[1] == ellipse):
-                    print("ellipse")
+                    nbrPositif += 1
+            else :
+                if (cle2[0] == "pointu" and cle2[1] == pointu):
                     nbrPositif += 1
 
         listeResultat.append((espece, float(nbrPositif) / float(nbrAttribus) * 100))
@@ -602,22 +618,26 @@ def main():
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau3.jpg")
-    input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
-    # input = cv2.imread("base_donnee_feuille/platane/platane2.jpg")
+    # input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
+    # input = cv2.imread("base_donnee_feuille/platane/pla tane2.jpg")
 
     input = redimension(input)
     cv2.imshow("feuille", input)
 
     thresh, contourUtileBase, contourConvexBase = segmentation(input)
 
-    height, width, channels = input.shape
-
     #Retirer la queue et avoir un masque utilisable pour determiner la forme
     masquethresh, contourUtileMasque, contourConvexMasque, centreMasque = masqueSansQueue(thresh)
 
+    # detection convexite :
+    convexite, pointu = feuille_convexe(contourUtileBase, contourConvexBase, input)
+    print("feuille entiere : {} | pointu = {}".format(convexite, pointu))
 
 
-    #TODO : regarder pour les feuille pas entiere si les bord sont pointus (platane) ou arrondi (chene)
+
+
+
+
     #TODO : regarde la largeur des feuilles : pour difference le margousier et le bouleau
 
 
@@ -638,14 +658,12 @@ def main():
     print("Forme ellipse : {}".format(ellipse))
 
     #detection dent :
-    dents = detection_dent(contourUtileBase, input)
+    dents = detection_dent(contourUtileBase, input, True)
     print("presence de dent : {}".format(dents))
 
-    #detection convexite :
-    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input)
-    print("feuille entiere : {}".format(convexite))
 
-    listeResultat = etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, ellipse, 'arbre.json')
+
+    listeResultat = etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, 'arbre.json')
     print(listeResultat)
 
     cv2.waitKey(0)

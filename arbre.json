@@ -10,7 +10,8 @@
 	},
 "chene": { 
 	"dent": false,
-	"convexe": false
+	"convexe": false,
+	"pointu" : false
 	},
 "bouleau": {
 	"dent": true,
@@ -23,7 +24,8 @@
 	},
 "platane": { 
 	"dent": true,
-	"convexe": false
+	"convexe": false,
+	"pointu" : true
 	},
 "margousier": {
 	"dent": true,
