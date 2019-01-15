@@ -1,7 +1,12 @@
 {
 "hetre": {
 	"dent": false,
-	"convexe": true
+	"convexe": true,
+	"triangle" : false,
+	"cercle" : false,
+	"rectangle" : false,
+	"carre" : false,
+	"ellipse" : true
 	},
 "chene": { 
 	"dent": false,
@@ -9,7 +14,12 @@
 	},
 "bouleau": {
 	"dent": true,
-	"convexe": true
+	"convexe": true,
+	"triangle" : true,
+	"cercle" : false,
+	"rectangle" : false,
+	"carre" : false,
+	"ellipse" : false
 	},
 "platane": { 
 	"dent": true,
@@ -17,7 +27,12 @@
 	},
 "margousier": {
 	"dent": true,
-	"convexe": true
+	"convexe": true,
+	"triangle" : true,
+	"cercle" : false,
+	"rectangle" : false,
+	"carre" : false,
+	"ellipse" : false
 	},
 "baobab": { 
 	"dent": false,

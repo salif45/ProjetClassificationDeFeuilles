@@ -9,6 +9,7 @@ def dist(A,B):
     return output
 
 def calcAngle(a,b,c):
+    #normalisation des vecteurs
     vecBA = np.array([a[0] - b[0], a[1] - b[1]])
     vecBA = vecBA / np.linalg.norm(vecBA)
     vecBC = np.array([c[0] - b[0], c[1] - b[1]])
@@ -17,7 +18,7 @@ def calcAngle(a,b,c):
     angle = np.arccos(np.dot(vecBA, vecBC)) * 180 / pi
     return angle
 
-def detection_dent(contourUtile, imageDeBase ):
+def detection_dent(contourUtile, imageDeBase, debug = False ):
     dent = imageDeBase.copy();
 
     list_contour = [] #pour stocker les points qui sont consideres comme des dents
@@ -33,12 +34,17 @@ def detection_dent(contourUtile, imageDeBase ):
         AC = np.linalg.norm(c - a)
         if ((AC / (AB + BC)) < 0.926): #valeur determiner par l'experience : seuil a partir duquel on considere que les points ne sont pas alignes
             list_contour.append(b)
-    #Affichage des dents
-    # cv2.drawContours(dent, list_contour, -1, (0, 0, 255), 3)
-    # cv2.imshow("dents de la feuille", dent)
 
-    #nombre de dents
-    nombreDent = len(list_contour)
+            # nombre de dents
+            nombreDent = len(list_contour)
+
+    #Affichage des dents
+    if debug == True :
+        cv2.drawContours(dent, list_contour, -1, (0, 0, 255), 3)
+        cv2.imshow("dents de la feuille", dent)
+        print("Nombre de dents detectees : {}".format(nombreDent))
+
+
     #On fait un seuil a partir duquel on considere qu'il y a des dents
     presenceDent = False
     if nombreDent > 20 :
@@ -46,7 +52,7 @@ def detection_dent(contourUtile, imageDeBase ):
     return presenceDent
 
 
-def feuille_convexe(contourUtile, hull, imageDeBase):
+def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
 
     #On recupere les defauts de convexite de notre contour
     defects = cv2.convexityDefects(contourUtile, hull)
@@ -56,25 +62,33 @@ def feuille_convexe(contourUtile, hull, imageDeBase):
         start = tuple(contourUtile[s][0]) #point du contours convexe avant
         end = tuple(contourUtile[e][0])   #point du contours convexe d'apres
         far = tuple(contourUtile[f][0])   #defaut de convexite entre les deux
-        #affichage du contour convexe
-        cv2.line(imageDeBase, start, end, [0, 255, 0], 2)
-        cv2.circle(imageDeBase, start, 5, [0, 255, 0], -1)
 
-        #calcul des vecteurs normalises entre le defaut de convexite et le contour convexe
-        angle = calcAngle(start,far,end)
+        # calcul de l'angle
+        angle = calcAngle(start, far, end)
+
+        #affichage du contour convexe
+        if debug == True :
+            cv2.line(imageDeBase, start, end, [0, 255, 0], 2)
+            cv2.circle(imageDeBase, start, 5, [0, 255, 0], -1)
+            cv2.circle(imageDeBase, far, 5, [255, 0, 0], -1)
+            print("angle : {}".format(angle))
+
+
 
         #on ne considere que les defauts de convexite qui forme un angle assez petit
-        if (angle <100) :
+        if (angle <115) :
             defautDetecte += 1
             #affichage des defauts selectionnes
-            cv2.circle(imageDeBase, far, 5, [0, 0, 255], -1)
+            if debug == True :
+                cv2.circle(imageDeBase, far, 5, [0, 0, 255], -1)
+    print("nb defaut = {}".format(defautDetecte))
+    convex = False
+    if defautDetecte < 3:
+        convex = True
 
-    # affichage defauts
-    # cv2.imshow('fin', imageDeBase)
-
-    convex=False
-    if defautDetecte <2:
-        convex=True
+    if debug == True :
+        cv2.imshow('feuille entiere', imageDeBase)
+        print("Feuille entiere : {}".format(convex))
 
     return convex
 
@@ -579,7 +593,8 @@ def etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, e
 def main():
     # input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
     # input = cv2.imread("base_donnee_feuille/hetre/hetre2.jpg")
-    input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
+    # input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
+    input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
     # input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
@@ -624,7 +639,7 @@ def main():
     print("presence de dent : {}".format(dents))
 
     #detection convexite :
-    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input)
+    convexite= feuille_convexe(contourUtileBase, contourConvexBase, input, True)
     print("feuille entiere : {}".format(convexite))
 
     listeResultat = etude_classificateur(convexite, dents, triangle, cercle, rectangle, carre, ellipse, 'arbre.json')
