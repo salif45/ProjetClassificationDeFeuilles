@@ -19,7 +19,12 @@ class Example(QMainWindow):
         self.listImageCurrentFolder = []
         self.listFolder = []
         self.begin = [-1,-1]
+        self.beginColor = [-1,-1]
         self.end = [-1,-1]
+        self.endColor = [-1,-1]
+        self.crop = False
+        self.LPen = 0
+        self.currentImage = None
         self.CentralWidget = QWidget()
         self.lbl = QLabel()
         self.initUI()
@@ -55,14 +60,24 @@ class Example(QMainWindow):
         OpenButton.clicked.connect(self.addImage)
 
         CropButton = QPushButton('Crop', self)
-        CropButton.clicked.connect(self.getContour)
+        CropButton.clicked.connect(self.cropImage)
+
+        AnalyseButton = QPushButton('Analyse', self)
+        AnalyseButton.clicked.connect(self.Analyse)
+
+        RestartButton = QPushButton('Restart', self)
+        RestartButton.clicked.connect(self.Restart)
 
         hbox = QHBoxLayout()
-        hbox.addWidget(QuitButton)
+        hbox.addWidget(OpenButton)
         hbox.addStretch(1)
         hbox.addWidget(CropButton)
         hbox.addStretch(1)
-        hbox.addWidget(OpenButton)
+        hbox.addWidget(RestartButton)
+        hbox.addStretch(1)
+        hbox.addWidget(AnalyseButton)
+        hbox.addStretch(1)
+        hbox.addWidget(QuitButton)
 
 
         hbox1 = QHBoxLayout()
@@ -79,7 +94,7 @@ class Example(QMainWindow):
         self.CentralWidget.setLayout(vbox)
 
         self.setCentralWidget(self.CentralWidget)
-        self.setGeometry(300, 300, 300, 200)
+        self.setGeometry(100, 100, 300, 200)
         self.setWindowTitle('Tooltips')
         self.show()
 
@@ -92,6 +107,8 @@ class Example(QMainWindow):
             self.CurrentFolder = (self.name.rsplit('/',1))[0] + '/'
             self.listAllImage()
             self.listAllFolder()
+            self.crop = False
+            self.currentImage = QPixmap(self.name)
 
     def listAllImage(self):
         test = self.CurrentFolder + "*.jpg"
@@ -112,26 +129,29 @@ class Example(QMainWindow):
             Images = glob.glob(test) + glob.glob(test1) + glob.glob(test2)
             if len(Images) <= 0:
                 self.listFolder.remove(dossier)
-        print(self.listFolder)
 
     def printImage(self):
-        pixmap = QPixmap(self.name)
+
+        pixmap = self.currentImage
+
         height = pixmap.height()
         width = pixmap.width()
         LARGEUR = 500
-
         facteur = float(LARGEUR) / float(width)
 
         pixmap = pixmap.scaled(width*facteur, height*facteur)
         height = pixmap.height()
         width = pixmap.width()
+
+        self.currentImage = pixmap
         self.lbl.clear()
         self.lbl.resize(width, height)
         self.lbl.setPixmap(pixmap)
-        self.setGeometry(300, 300, width, height)
+        self.setGeometry(100, 100, width, height)
         self.show()
 
     def addImage(self):
+
         self.showDialog()
         self.printImage()
 
@@ -146,52 +166,100 @@ class Example(QMainWindow):
         else:
             event.ignore()
 
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+
+            self.printImage()
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
+            if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+                if (x < 0):
+                    x = 0
+                if (x >=pic.width()):
+                    x = pic.width() - 1
+                if (y < 0):
+                    y = 0
+                if (y >= pic.height()):
+                    y = pic.height() - 1
+
+                self.begin =[x,y]
+                self.LPen = 0
+
+        elif e.button() == Qt.RightButton:
+
+            self.printImage()
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
+            if (x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+                if (x < 0):
+                    x = 0
+                if (x >= pic.width()):
+                    x = pic.width() - 1
+                if (y < 0):
+                    y = 0
+                if (y >= pic.height()):
+                    y = pic.height() - 1
+                self.LPen = 1
+                self.beginColor = [x, y]
+
     def mouseMoveEvent(self, e):
 
-        self.printImage()
-        x = e.x() - 10
-        y = e.y() - 10
-        pic = self.lbl.pixmap()
-        if (x < 0):
-            x = 0
-        if (x >=pic.width()):
-            x = pic.width() - 1
-        if (y < 0):
-            y = 0
-        if (y >= pic.height()):
-            y = pic.height() - 1
-        qp = QPainter(pic)
-        pen = QPen()
-        pen.setWidth(2)
-        qp.setPen(pen)
-        Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
-        qp.drawRect(Rect)
-        self.lbl.setPixmap(pic)
+        if self.LPen == 0:
 
-    def mousePressEvent(self, e):
-        self.printImage()
-        x = e.x() - 10
-        y = e.y() - 10
-        pic = self.lbl.pixmap()
-        if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+            self.printImage()
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
             if (x < 0):
                 x = 0
-            if (x >=pic.width()):
+            if (x >= pic.width()):
                 x = pic.width() - 1
             if (y < 0):
                 y = 0
             if (y >= pic.height()):
                 y = pic.height() - 1
 
+            qp = QPainter(pic)
+            pen = QPen()
+            pen.setWidth(2)
+            pen.setColor(QColor(255,0,0))
+            qp.setPen(pen)
+            Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
+            qp.drawRect(Rect)
+            self.lbl.setPixmap(pic)
 
-            self.begin =[x,y]
+        else:
 
-    def mouseReleaseEvent(self, QMouseEvent):
+            self.printImage()
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
+            if (x < 0):
+                x = 0
+            if (x >= pic.width()):
+                x = pic.width() - 1
+            if (y < 0):
+                y = 0
+            if (y >= pic.height()):
+                y = pic.height() - 1
 
-        x = QMouseEvent.x() - 10
-        y = QMouseEvent.y() - 10
-        pic = self.lbl.pixmap()
-        if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+            qp = QPainter(pic)
+            pen = QPen()
+            pen.setWidth(2)
+            pen.setColor(QColor(0, 0, 255))
+            qp.setPen(pen)
+            Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
+            qp.drawRect(Rect)
+            self.lbl.setPixmap(pic)
+
+    def mouseReleaseEvent(self, e):
+
+        if e.button() == Qt.LeftButton:
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
             if (x < 0):
                 x = 0
             if (x >=pic.width()):
@@ -203,40 +271,88 @@ class Example(QMainWindow):
             qp = QPainter(pic)
             pen = QPen()
             pen.setWidth(2)
+            pen.setColor(QColor(255,0,0))
             qp.setPen(pen)
             Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
             qp.drawRect(Rect)
             self.lbl.setPixmap(pic)
             self.end = [x,y]
 
-    def getContour(self):
+        elif e.button() == Qt.RightButton:
 
-        if (self.begin[0] != -1 and self.begin[1] != -1 and self.end[0] != -1 and self.end[1] !=-1):
-            print('getcontour',self.begin,self.end)
+            x = e.x() - 10
+            y = e.y() - 10
+            pic = self.lbl.pixmap()
+            if (x < 0):
+                x = 0
+            if (x >=pic.width()):
+                x = pic.width() - 1
+            if (y < 0):
+                y = 0
+            if (y >= pic.height()):
+                y = pic.height() - 1
+            qp = QPainter(pic)
+            pen = QPen()
+            pen.setWidth(2)
+            pen.setColor(QColor(0,0,255))
+            qp.setPen(pen)
+            Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
+            qp.drawRect(Rect)
+            self.lbl.setPixmap(pic)
+            self.endColor = [x,y]
 
-    # def paintEvent(self, paint_event):
-    #     qp = QPainter(self)
-    #     if (self.begin[0] != -1 and self.begin[0] != 1):
-    #         qp.drawPixmap(self.rect(),self.lbl.pixmap())
-    #         pen = QPen()
-    #         pen.setWidth(20)
-    #         pen.setColor(QColor(255,0,0))
-    #         qp.setPen(pen)
-    #         qp.setRenderHint(QPainter.Antialiasing, True)
-    #         qp.drawPoint(self.begin[0], self.begin[1])
+    def cropImage(self):
 
+        if self.begin[0] != -1 and self.begin[1] != -1 and self.end[0] != -1 and self.end[1] !=-1:
+            pixmap = self.currentImage
+            x, y = self.begin
+            x1, y1 = self.end
+            width = x1 - x
+            height = y1 - y
 
+            if width < 0:
+                a = x1
+                x1 = x
+                x = a
+            if height < 0:
+                a = y1
+                y1 = x
+                y = a
+            copy = pixmap.copy(x, y, abs(width), abs(height))
+
+            LARGEUR = 500
+            facteur = float(LARGEUR) / float(abs(width))
+            pixmap = copy.scaled(abs(width) * facteur, abs(height) * facteur)
+            height = pixmap.height()
+            width = pixmap.width()
+
+            self.currentImage = pixmap
+            self.crop = True
+            self.lbl.clear()
+            self.lbl.resize(width, height)
+            self.lbl.setPixmap(copy)
+            self.setGeometry(100, 100, width, height)
+            self.show()
+            
     def keyPressEvent(self, event):
+
+        self.crop = False
         key = event.key()
+        self.begin = [-1,-1]
+        self.end = [-1,-1]
         if key == Qt.Key_Q:
             index = self.listImageCurrentFolder.index(self.name)
             length = len(self.listImageCurrentFolder)
             if index == 0:
                 index = length - 1
                 self.name = self.listImageCurrentFolder[index]
+                self.currentImage = QPixmap(self.name)
+
             else:
                 index -= 1
                 self.name = self.listImageCurrentFolder[index]
+                self.currentImage = QPixmap(self.name)
+
             self.printImage()
 
         elif key == Qt.Key_D:
@@ -245,9 +361,13 @@ class Example(QMainWindow):
             if index == length - 1:
                 index = 0
                 self.name = self.listImageCurrentFolder[index]
+                self.currentImage = QPixmap(self.name)
+
             else:
                 index += 1
                 self.name = self.listImageCurrentFolder[index]
+                self.currentImage = QPixmap(self.name)
+
             self.printImage()
 
         elif key == Qt.Key_S:
@@ -258,13 +378,15 @@ class Example(QMainWindow):
                 self.CurrentFolder = self.listFolder[index]
                 self.listAllImage()
                 self.name = self.listImageCurrentFolder[0]
+                self.currentImage = QPixmap(self.name)
+
             else:
                 index -= 1
                 self.CurrentFolder = self.listFolder[index]
                 self.listAllImage()
                 self.name = self.listImageCurrentFolder[0]
+                self.currentImage = QPixmap(self.name)
 
-            print(self.CurrentFolder)
             self.printImage()
 
         elif key == Qt.Key_Z:
@@ -281,10 +403,22 @@ class Example(QMainWindow):
                 self.listAllImage()
                 self.name = self.listImageCurrentFolder[0]
             self.printImage()
-            print(self.CurrentFolder)
 
         elif key == Qt.Key_Escape:
             self.close()
+
+    def Analyse(self):
+        print("test")
+
+    def Restart(self):
+        self.currentImage = QPixmap(self.name)
+        self.printImage()
+        self.begin = [-1, -1]
+        self.beginColor = [-1, -1]
+        self.end = [-1, -1]
+        self.endColor = [-1, -1]
+        self.crop = False
+        self.LPen = 0
 
 
 if __name__ == '__main__':
