@@ -460,6 +460,7 @@ def checkCarre(pointGrandAxe1, pointGrandAxe2, contourUtile, input, debug = Fals
 
 def checkEllipse(pointGrandAxe1, pointGrandAxe2, contourUtile, input, debug = False):
     ellipse = False
+    epaisseur = 0
     vecGrandAxe = [pointGrandAxe2[0] - pointGrandAxe1[0], pointGrandAxe2[1] - pointGrandAxe1[1]]
     vecPerp =[-vecGrandAxe[1], vecGrandAxe[0]]
     # Demi grand axe : On va au centre du grand axe et on cherche les points
@@ -540,7 +541,18 @@ def checkEllipse(pointGrandAxe1, pointGrandAxe2, contourUtile, input, debug = Fa
     if (listeDistanceEllipse.std() < 30) and (0.8 <= r1 and r1 <= 1.2) and (0.8 <= r2 and r2 <= 1.2):
         ellipse = True
 
-    return ellipse
+    rapportEpaisseur = q / p
+    print("!!!!!!!!!!!!!!!!!!!!!!!!", q/p)
+    if rapportEpaisseur < 0.3 :
+        epaisseur = 0
+    elif (rapportEpaisseur>=0.3 and rapportEpaisseur<0.6):
+        epaisseur = 1
+    else :
+        epaisseur = 2
+
+
+
+    return ellipse, epaisseur
 
 
 def redimension(imageDeBase):
@@ -574,7 +586,7 @@ def segmentation(input): #TODO : mettre la bonne segmentation
     return thresh, contourFeuille, contourConvex
 
 
-def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, jsonPath):
+def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, jsonPath):
     # ouverture du fichier JSON et mise sous forme de dictionnaire
     with open(jsonPath) as json_data:
         data_dict = json.load(json_data)
@@ -591,6 +603,8 @@ def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, 
             if (cle2[0] == "convexe" and cle2[1] == convexite):
                 nbrPositif += 1
             if (cle2[0] == "dent" and cle2[1] == dents):
+                nbrPositif += 1
+            if (cle2[0] == "epaisseur" and cle2[1] == epaisseur):
                 nbrPositif += 1
             #on ne regarde la forme que si la feuille est entiere
             if (convexite == True):
@@ -613,16 +627,16 @@ def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, 
     return listeResultat
 
 def main():
-    # input = cv2.imread("base_donnee_feuille/hetre/hetre5.jpg")
+    # input = cv2.imread("base_donnee_feuille/hetre/hetre1.jpg")
     # input = cv2.imread("base_donnee_feuille/hetre/hetre2.jpg")
     # input = cv2.imread("base_donnee_feuille/chene/chene1.jpg")
     # input = cv2.imread("base_donnee_feuille/chene/chene2.jpg")
-    # input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
-    input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
+    input = cv2.imread("base_donnee_feuille/margousier/margousier2.jpg")
+    # input = cv2.imread("base_donnee_feuille/bouleau/bouleau1.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau2.jpg")
     # input = cv2.imread("base_donnee_feuille/bouleau/bouleau3.jpg")
     # input = cv2.imread("base_donnee_feuille/platane/platane1.jpg")
-    # input = cv2.imread("base_donnee_feuille/platane/platane4.jpg")
+    # input = cv2.imread("base_donnee_feuille/platane/platane2.jpg")
 
     input = redimension(input)
     cv2.imshow("feuille", input)
@@ -660,16 +674,16 @@ def main():
     carre = checkCarre(grandAxe1, grandAxe2, contourUtileMasque, input)
     print("Forme carre : {}".format(carre))
     # Detection forme : ellipse
-    ellipse = checkEllipse(grandAxe1, grandAxe2, contourUtileMasque, input, True)
+    ellipse, epaisseur = checkEllipse(grandAxe1, grandAxe2, contourUtileMasque, input, True)
     print("Forme ellipse : {}".format(ellipse))
-
+    print("largeur : {}".format(epaisseur))
     #detection dent :
     dents = detection_dent(contourUtileBase, input, True)
     print("presence de dent : {}".format(dents))
 
 
 
-    listeResultat = etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, 'arbre.json')
+    listeResultat = etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, 'arbre.json')
     print(listeResultat)
 
     cv2.waitKey(0)
