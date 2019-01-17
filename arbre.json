@@ -6,12 +6,14 @@
 	"cercle" : false,
 	"rectangle" : false,
 	"carre" : false,
-	"ellipse" : true
+	"ellipse" : true,
+	"epaisseur" : 2
 	},
 "chene": { 
 	"dent": false,
 	"convexe": false,
-	"pointu" : false
+	"pointu" : false, 
+	"epaisseur" : 1
 	},
 "bouleau": {
 	"dent": true,
@@ -20,12 +22,14 @@
 	"cercle" : false,
 	"rectangle" : false,
 	"carre" : false,
-	"ellipse" : false
+	"ellipse" : false,
+	"epaisseur" : 2
 	},
 "platane": { 
 	"dent": true,
 	"convexe": false,
-	"pointu" : true
+	"pointu" : true,
+	"epaisseur" : 2
 	},
 "margousier": {
 	"dent": true,
@@ -34,7 +38,8 @@
 	"cercle" : false,
 	"rectangle" : false,
 	"carre" : false,
-	"ellipse" : false
+	"ellipse" : false,
+	"epaisseur" : 0
 	},
 "baobab": { 
 	"dent": false,
