@@ -41,8 +41,14 @@
 	"ellipse" : false,
 	"epaisseur" : 0
 	},
-"baobab": { 
+"olivier": { 
 	"dent": false,
-	"convexe": false
+	"convexe": true,
+	"triangle" : false,
+	"cercle" : false,
+	"rectangle" : false,
+	"carre" : false,
+	"ellipse" : true,
+	"epaisseur" : 0
 	}
 }    
