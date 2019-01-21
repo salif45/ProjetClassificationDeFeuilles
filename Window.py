@@ -8,6 +8,11 @@ import os
 import math
 import glob
 import string
+import contour
+import numpy as np
+import cv2 as cv2
+
+
 
 class Example(QMainWindow):
 
@@ -26,7 +31,8 @@ class Example(QMainWindow):
         self.LPen = 0
         self.currentImage = None
         self.CentralWidget = QWidget()
-        self.lbl = QLabel()
+        self.lbl_down = QLabel()
+        self.lbl_top = QLabel()
         self.initUI()
 
     def initUI(self):
@@ -52,9 +58,9 @@ class Example(QMainWindow):
 
         ##### Buttons #####
         
-        QuitButton = QPushButton('Quit', self)
-
-        QuitButton.clicked.connect(self.close)
+        # QuitButton = QPushButton('Quit', self)
+        #
+        # QuitButton.clicked.connect(self.close)
 
         OpenButton = QPushButton('Open', self)
         OpenButton.clicked.connect(self.addImage)
@@ -65,28 +71,41 @@ class Example(QMainWindow):
         AnalyseButton = QPushButton('Analyse', self)
         AnalyseButton.clicked.connect(self.Analyse)
 
+        SegmentationButton = QPushButton('Segmentation', self)
+        SegmentationButton.clicked.connect(self.Segmentation)
+
         RestartButton = QPushButton('Restart', self)
         RestartButton.clicked.connect(self.Restart)
+
+        hbox_top = QHBoxLayout()
+        hbox_top.addStretch(1)
+        hbox_top.addWidget(self.lbl_top)
+        hbox_top.addStretch(1)
+
+
+        hbox1 = QHBoxLayout()
+        pixmap = QPixmap()
+        self.lbl_down.setPixmap(pixmap)
+
+        hbox1.addWidget(self.lbl_down)
 
         hbox = QHBoxLayout()
         hbox.addWidget(OpenButton)
         hbox.addStretch(1)
         hbox.addWidget(CropButton)
         hbox.addStretch(1)
-        hbox.addWidget(RestartButton)
+        hbox.addWidget(SegmentationButton)
         hbox.addStretch(1)
         hbox.addWidget(AnalyseButton)
         hbox.addStretch(1)
-        hbox.addWidget(QuitButton)
+        hbox.addWidget(RestartButton)
 
 
-        hbox1 = QHBoxLayout()
-        pixmap = QPixmap()
-        self.lbl.setPixmap(pixmap)
-
-        hbox1.addWidget(self.lbl)
+        self.lbl_top.setText("Choisir votre image")
 
         vbox = QVBoxLayout()
+        vbox.addLayout(hbox_top)
+        vbox.addStretch(1)
         vbox.addLayout(hbox1)
         vbox.addStretch(1)
         vbox.addLayout(hbox)
@@ -144,9 +163,9 @@ class Example(QMainWindow):
         width = pixmap.width()
 
         self.currentImage = pixmap
-        self.lbl.clear()
-        self.lbl.resize(width, height)
-        self.lbl.setPixmap(pixmap)
+        self.lbl_down.clear()
+        self.lbl_down.resize(width, height)
+        self.lbl_down.setPixmap(pixmap)
         self.setGeometry(100, 100, width, height)
         self.show()
 
@@ -172,7 +191,7 @@ class Example(QMainWindow):
             self.printImage()
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
                 if (x < 0):
                     x = 0
@@ -191,7 +210,7 @@ class Example(QMainWindow):
             self.printImage()
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if (x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
                 if (x < 0):
                     x = 0
@@ -211,7 +230,7 @@ class Example(QMainWindow):
             self.printImage()
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if (x < 0):
                 x = 0
             if (x >= pic.width()):
@@ -228,14 +247,14 @@ class Example(QMainWindow):
             qp.setPen(pen)
             Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
             qp.drawRect(Rect)
-            self.lbl.setPixmap(pic)
+            self.lbl_down.setPixmap(pic)
 
         else:
 
             self.printImage()
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if (x < 0):
                 x = 0
             if (x >= pic.width()):
@@ -252,14 +271,14 @@ class Example(QMainWindow):
             qp.setPen(pen)
             Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
             qp.drawRect(Rect)
-            self.lbl.setPixmap(pic)
+            self.lbl_down.setPixmap(pic)
 
     def mouseReleaseEvent(self, e):
 
         if e.button() == Qt.LeftButton:
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if (x < 0):
                 x = 0
             if (x >=pic.width()):
@@ -275,14 +294,14 @@ class Example(QMainWindow):
             qp.setPen(pen)
             Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
             qp.drawRect(Rect)
-            self.lbl.setPixmap(pic)
+            self.lbl_down.setPixmap(pic)
             self.end = [x,y]
 
         elif e.button() == Qt.RightButton:
 
             x = e.x() - 10
             y = e.y() - 10
-            pic = self.lbl.pixmap()
+            pic = self.lbl_down.pixmap()
             if (x < 0):
                 x = 0
             if (x >=pic.width()):
@@ -298,7 +317,7 @@ class Example(QMainWindow):
             qp.setPen(pen)
             Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
             qp.drawRect(Rect)
-            self.lbl.setPixmap(pic)
+            self.lbl_down.setPixmap(pic)
             self.endColor = [x,y]
 
     def cropImage(self):
@@ -328,9 +347,9 @@ class Example(QMainWindow):
 
             self.currentImage = pixmap
             self.crop = True
-            self.lbl.clear()
-            self.lbl.resize(width, height)
-            self.lbl.setPixmap(copy)
+            self.lbl_down.clear()
+            self.lbl_down.resize(width, height)
+            self.lbl_down.setPixmap(copy)
             self.setGeometry(100, 100, width, height)
             self.show()
             
@@ -397,18 +416,37 @@ class Example(QMainWindow):
                 self.CurrentFolder = self.listFolder[index]
                 self.listAllImage()
                 self.name = self.listImageCurrentFolder[0]
+                self.currentImage = QPixmap(self.name)
+
             else:
                 index += 1
                 self.CurrentFolder = self.listFolder[index]
                 self.listAllImage()
                 self.name = self.listImageCurrentFolder[0]
+                self.currentImage = QPixmap(self.name)
+
             self.printImage()
 
         elif key == Qt.Key_Escape:
             self.close()
 
+
+    def Segmentation(self):
+        print("coucou")
+        
     def Analyse(self):
-        print("test")
+        # contour.main()
+        Image = self.currentImage.toImage()
+        if os. path. isfile("image_to_analyse.bmp"):
+            os.remove("image_to_analyse.bmp")
+            print("removed")
+        Image.save("image_to_analyse.bmp", quality=100)
+        # im = cv2.imread('image_to_analyse.bmp')
+        listResult = contour.analyse("image_to_analyse.bmp")
+        self.currentImage = QPixmap("image_to_analyse.bmp")
+        self.printImage
+        self.lbl_top.setText("Resultat : {} ({}%) ou {} ({}%)".format(listResult[0][0],listResult[0][1], listResult[1][0], listResult[1][1]))
+        Image = None
 
     def Restart(self):
         self.currentImage = QPixmap(self.name)
