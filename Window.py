@@ -5,12 +5,10 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import os
-import math
 import glob
-import string
 import contour
-import numpy as np
-import cv2 as cv2
+# import distance_transform
+
 
 
 
@@ -27,12 +25,19 @@ class Example(QMainWindow):
         self.beginColor = [-1,-1]
         self.end = [-1,-1]
         self.endColor = [-1,-1]
+        self.outside = []
         self.crop = False
+        self.segmentation = False
+        self.analyse = False
+
         self.LPen = 0
         self.currentImage = None
         self.CentralWidget = QWidget()
         self.lbl_down = QLabel()
         self.lbl_top = QLabel()
+
+        self.CheckBox_crop = QCheckBox()
+        self.CheckBox_segmentation = QCheckBox()
         self.initUI()
 
     def initUI(self):
@@ -49,7 +54,7 @@ class Example(QMainWindow):
         openFile.triggered.connect(self.addImage)
 
         ##### Menubar #####
-        
+
         menubar = self.menuBar()
 
         fileMenu = menubar.addMenu('&File')
@@ -57,10 +62,10 @@ class Example(QMainWindow):
         fileMenu.addAction(ExitApp)
 
         ##### Buttons #####
-        
-        # QuitButton = QPushButton('Quit', self)
-        #
-        # QuitButton.clicked.connect(self.close)
+
+        SegmentationButton = QPushButton('Segmentation', self)
+
+        SegmentationButton.clicked.connect(self.Segmentation)
 
         OpenButton = QPushButton('Open', self)
         OpenButton.clicked.connect(self.addImage)
@@ -71,23 +76,32 @@ class Example(QMainWindow):
         AnalyseButton = QPushButton('Analyse', self)
         AnalyseButton.clicked.connect(self.Analyse)
 
-        SegmentationButton = QPushButton('Segmentation', self)
-        SegmentationButton.clicked.connect(self.Segmentation)
-
         RestartButton = QPushButton('Restart', self)
         RestartButton.clicked.connect(self.Restart)
+
+        self.CheckBox_crop = QCheckBox('Crop', self)
+        self.CheckBox_crop.stateChanged.connect(lambda: self.fct_check_box(self.CheckBox_crop))
+
+        self.CheckBox_segmentation = QCheckBox('Segmentation', self)
+        self.CheckBox_segmentation.clicked.connect(lambda: self.fct_check_box(self.CheckBox_segmentation))
 
         hbox_top = QHBoxLayout()
         hbox_top.addStretch(1)
         hbox_top.addWidget(self.lbl_top)
         hbox_top.addStretch(1)
 
-
         hbox1 = QHBoxLayout()
         pixmap = QPixmap()
         self.lbl_down.setPixmap(pixmap)
-
         hbox1.addWidget(self.lbl_down)
+
+        hbox_check = QHBoxLayout()
+        hbox_check.addStretch(1)
+        hbox_check.addWidget(self.CheckBox_crop)
+        hbox_check.addStretch(1)
+        hbox_check.addWidget(self.CheckBox_segmentation)
+        hbox_check.addStretch(1)
+
 
         hbox = QHBoxLayout()
         hbox.addWidget(OpenButton)
@@ -107,6 +121,8 @@ class Example(QMainWindow):
         vbox.addLayout(hbox_top)
         vbox.addStretch(1)
         vbox.addLayout(hbox1)
+        vbox.addStretch(1)
+        vbox.addLayout(hbox_check)
         vbox.addStretch(1)
         vbox.addLayout(hbox)
 
@@ -186,11 +202,11 @@ class Example(QMainWindow):
             event.ignore()
 
     def mousePressEvent(self, e):
-        if e.button() == Qt.LeftButton:
 
+        if self.CheckBox_crop.checkState() == 2:
             self.printImage()
             x = e.x() - 10
-            y = e.y() - 10
+            y = e.y() - 33
             pic = self.lbl_down.pixmap()
             if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
                 if (x < 0):
@@ -205,13 +221,86 @@ class Example(QMainWindow):
                 self.begin =[x,y]
                 self.LPen = 0
 
-        elif e.button() == Qt.RightButton:
+        if self.CheckBox_segmentation.checkState() == 2:
+            if e.button() == Qt.LeftButton:
+                self.printImage()
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
+                if ( x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+                    if (x < 0):
+                        x = 0
+                    if (x >=pic.width()):
+                        x = pic.width() - 1
+                    if (y < 0):
+                        y = 0
+                    if (y >= pic.height()):
+                        y = pic.height() - 1
 
+                    self.beginColor = [x,y]
+                    self.LPen = 0
+
+                    # Draw outside point
+                    qp = QPainter(pic)
+                    pen = QPen()
+                    pen.setWidth(2)
+                    pen.setColor(QColor(0, 0, 255))
+                    qp.setPen(pen)
+
+                    for i in range(len(self.outside)):
+                        qp.drawPoint(self.outside[i][0], self.outside[i][1])
+
+                    self.lbl_down.setPixmap(pic)
+
+
+            elif e.button() == Qt.RightButton:
+
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
+                if (x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+                    if (x < 0):
+                        x = 0
+                    if (x >= pic.width()):
+                        x = pic.width() - 1
+                    if (y < 0):
+                        y = 0
+                    if (y >= pic.height()):
+                        y = pic.height() - 1
+                    self.LPen = 1
+                    self.outside.append([x,y])
+
+    def mouseMoveEvent(self, e):
+
+        if self.CheckBox_crop.checkState() == 2:
             self.printImage()
             x = e.x() - 10
-            y = e.y() - 10
+            y = e.y() - 33
             pic = self.lbl_down.pixmap()
-            if (x >= -10 and x <= pic.width() + 10 and y >= -10 and y <= pic.height() + 10):
+            if (x < 0):
+                x = 0
+            if (x >= pic.width()):
+                x = pic.width() - 1
+            if (y < 0):
+                y = 0
+            if (y >= pic.height()):
+                y = pic.height() - 1
+            qp = QPainter(pic)
+            pen = QPen()
+            pen.setWidth(2)
+            pen.setColor(QColor(255, 0, 0))
+            qp.setPen(pen)
+            Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1])
+            qp.drawRect(Rect)
+            self.lbl_down.setPixmap(pic)
+
+        if self.CheckBox_segmentation.checkState() == 2:
+
+            if self.LPen == 0:
+                self.printImage()
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
                 if (x < 0):
                     x = 0
                 if (x >= pic.width()):
@@ -220,64 +309,54 @@ class Example(QMainWindow):
                     y = 0
                 if (y >= pic.height()):
                     y = pic.height() - 1
+
+                qp = QPainter(pic)
+                pen = QPen()
+                pen.setWidth(2)
+                pen.setColor(QColor(255, 0, 0))
+                qp.setPen(pen)
+                Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1])
+                qp.drawRect(Rect)
+
+                # Draw outside point
+
+                pen.setColor(QColor(0, 0, 255))
+                qp.setPen(pen)
+
+                for i in range(len(self.outside)):
+                    qp.drawPoint(self.outside[i][0], self.outside[i][1])
+
+                self.lbl_down.setPixmap(pic)
+
+            elif self.LPen == 1:
                 self.LPen = 1
-                self.beginColor = [x, y]
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
+                if (x < 0):
+                    x = 0
+                if (x >= pic.width()):
+                    x = pic.width() - 1
+                if (y < 0):
+                    y = 0
+                if (y >= pic.height()):
+                    y = pic.height() - 1
 
-    def mouseMoveEvent(self, e):
+                qp = QPainter(pic)
+                pen = QPen()
+                pen.setWidth(2)
+                pen.setColor(QColor(0, 0, 255))
+                qp.setPen(pen)
 
-        if self.LPen == 0:
-
-            self.printImage()
-            x = e.x() - 10
-            y = e.y() - 10
-            pic = self.lbl_down.pixmap()
-            if (x < 0):
-                x = 0
-            if (x >= pic.width()):
-                x = pic.width() - 1
-            if (y < 0):
-                y = 0
-            if (y >= pic.height()):
-                y = pic.height() - 1
-
-            qp = QPainter(pic)
-            pen = QPen()
-            pen.setWidth(2)
-            pen.setColor(QColor(255,0,0))
-            qp.setPen(pen)
-            Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
-            qp.drawRect(Rect)
-            self.lbl_down.setPixmap(pic)
-
-        else:
-
-            self.printImage()
-            x = e.x() - 10
-            y = e.y() - 10
-            pic = self.lbl_down.pixmap()
-            if (x < 0):
-                x = 0
-            if (x >= pic.width()):
-                x = pic.width() - 1
-            if (y < 0):
-                y = 0
-            if (y >= pic.height()):
-                y = pic.height() - 1
-
-            qp = QPainter(pic)
-            pen = QPen()
-            pen.setWidth(2)
-            pen.setColor(QColor(0, 0, 255))
-            qp.setPen(pen)
-            Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
-            qp.drawRect(Rect)
-            self.lbl_down.setPixmap(pic)
+                qp.drawPoint(x,y)
+                self.outside.append([x,y])
+                self.lbl_down.setPixmap(pic)
 
     def mouseReleaseEvent(self, e):
+        if self.CheckBox_crop.checkState() == 2:
 
-        if e.button() == Qt.LeftButton:
             x = e.x() - 10
-            y = e.y() - 10
+            y = e.y() - 33
             pic = self.lbl_down.pixmap()
             if (x < 0):
                 x = 0
@@ -292,33 +371,67 @@ class Example(QMainWindow):
             pen.setWidth(2)
             pen.setColor(QColor(255,0,0))
             qp.setPen(pen)
-            Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1]);
+            Rect = QRect(self.begin[0], self.begin[1], x - self.begin[0], y - self.begin[1])
             qp.drawRect(Rect)
             self.lbl_down.setPixmap(pic)
             self.end = [x,y]
 
-        elif e.button() == Qt.RightButton:
+        if self.CheckBox_segmentation.checkState() == 2:
+            if self.LPen == 0:
+                print("test")
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
+                if (x < 0):
+                    x = 0
+                if (x >=pic.width()):
+                    x = pic.width() - 1
+                if (y < 0):
+                    y = 0
+                if (y >= pic.height()):
+                    y = pic.height() - 1
+                qp = QPainter(pic)
+                pen = QPen()
+                pen.setWidth(2)
+                pen.setColor(QColor(255,0,0))
+                qp.setPen(pen)
+                Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1])
+                qp.drawRect(Rect)
 
-            x = e.x() - 10
-            y = e.y() - 10
-            pic = self.lbl_down.pixmap()
-            if (x < 0):
-                x = 0
-            if (x >=pic.width()):
-                x = pic.width() - 1
-            if (y < 0):
-                y = 0
-            if (y >= pic.height()):
-                y = pic.height() - 1
-            qp = QPainter(pic)
-            pen = QPen()
-            pen.setWidth(2)
-            pen.setColor(QColor(0,0,255))
-            qp.setPen(pen)
-            Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
-            qp.drawRect(Rect)
-            self.lbl_down.setPixmap(pic)
-            self.endColor = [x,y]
+                # Draw outside point
+
+                pen.setColor(QColor(0, 0, 255))
+                qp.setPen(pen)
+
+                for i in range(len(self.outside)):
+                    qp.drawPoint(self.outside[i][0], self.outside[i][1])
+
+                self.lbl_down.setPixmap(pic)
+                self.endColor = [x,y]
+
+            elif self.LPen == 1:
+                x = e.x() - 10
+                y = e.y() - 33
+                pic = self.lbl_down.pixmap()
+                if (x < 0):
+                    x = 0
+                if (x >= pic.width()):
+                    x = pic.width() - 1
+                if (y < 0):
+                    y = 0
+                if (y >= pic.height()):
+                    y = pic.height() - 1
+
+                qp = QPainter(pic)
+                pen = QPen()
+                pen.setWidth(2)
+                pen.setColor(QColor(0, 0, 255))
+                qp.setPen(pen)
+                # Rect = QRect(self.beginColor[0], self.beginColor[1], x - self.beginColor[0], y - self.beginColor[1]);
+                # qp.drawRect(Rect)
+                qp.drawPoint(x,y)
+                self.outside.append([x,y])
+                self.lbl_down.setPixmap(pic)
 
     def cropImage(self):
 
@@ -352,14 +465,24 @@ class Example(QMainWindow):
             self.lbl_down.setPixmap(copy)
             self.setGeometry(100, 100, width, height)
             self.show()
-            
+
     def keyPressEvent(self, event):
 
         self.crop = False
         key = event.key()
+        self.outside = []
         self.begin = [-1,-1]
+        self.beginColor = [-1,-1]
         self.end = [-1,-1]
+        self.endColor = [-1, -1]
+
         if key == Qt.Key_Q:
+            self.outside = []
+            self.begin = [-1, -1]
+            self.beginColor = [-1, -1]
+            self.end = [-1, -1]
+            self.endColor = [-1, -1]
+
             index = self.listImageCurrentFolder.index(self.name)
             length = len(self.listImageCurrentFolder)
             if index == 0:
@@ -375,6 +498,12 @@ class Example(QMainWindow):
             self.printImage()
 
         elif key == Qt.Key_D:
+            self.outside = []
+            self.begin = [-1, -1]
+            self.beginColor = [-1, -1]
+            self.end = [-1, -1]
+            self.endColor = [-1, -1]
+
             index = self.listImageCurrentFolder.index(self.name)
             length = len(self.listImageCurrentFolder)
             if index == length - 1:
@@ -390,6 +519,12 @@ class Example(QMainWindow):
             self.printImage()
 
         elif key == Qt.Key_S:
+            self.outside = []
+            self.begin = [-1, -1]
+            self.beginColor = [-1, -1]
+            self.end = [-1, -1]
+            self.endColor = [-1, -1]
+
             index = self.listFolder.index(self.CurrentFolder)
             length = len(self.listFolder)
             if index == 0:
@@ -409,6 +544,12 @@ class Example(QMainWindow):
             self.printImage()
 
         elif key == Qt.Key_Z:
+            self.outside = []
+            self.begin = [-1, -1]
+            self.beginColor = [-1, -1]
+            self.end = [-1, -1]
+            self.endColor = [-1, -1]
+
             index = self.listFolder.index(self.CurrentFolder)
             length = len(self.listFolder)
             if index == length - 1:
@@ -430,10 +571,34 @@ class Example(QMainWindow):
         elif key == Qt.Key_Escape:
             self.close()
 
-
     def Segmentation(self):
+        Image = self.currentImage.toImage()
+        if os.path.isfile("image_to_segment.bmp"):
+            os.remove("image_to_segment.bmp")
+            print("removed")
+        Image.save("image_to_segment.bmp", quality=100)
+        width = self.endColor[0] - self.beginColor[0]
+        height = self.endColor[1] - self.beginColor[1]
+        if width < 0:
+            self.beginColor[0] = self.endColor[0]
+            width = abs(width)
+        if height < 0:
+            self.beginColor[1] = self.endColor[1]
+            height = abs(height)
+
+        # distance_transform.ImgToSegmentate("image_to_segment.bmp", self.beginColor, width, height, self.outside)
         print("coucou")
-        
+        # print("out", self.outside)
+        # print("begin crop", self.begin)
+        # print(self.end)
+        # print("begin inside",self.beginColor)
+        # print(self.endColor)
+        self.outside = []
+        self.begin = [-1,-1]
+        self.beginColor = [-1,-1]
+        self.end = [-1,-1]
+        self.endColor = [-1, -1]
+
     def Analyse(self):
         # contour.main()
         Image = self.currentImage.toImage()
@@ -451,12 +616,22 @@ class Example(QMainWindow):
     def Restart(self):
         self.currentImage = QPixmap(self.name)
         self.printImage()
-        self.begin = [-1, -1]
-        self.beginColor = [-1, -1]
-        self.end = [-1, -1]
+        self.outside = []
+        self.begin = [-1,-1]
+        self.beginColor = [-1,-1]
+        self.end = [-1,-1]
         self.endColor = [-1, -1]
         self.crop = False
         self.LPen = 0
+
+    def fct_check_box(self, b):
+        ## Fonction qui gère les checkbox afin qu'il n'y ait au plus qu'une seule checkbox active
+        if b.text() == "Crop":
+            self.CheckBox_segmentation.setCheckState(0)
+
+        elif b.text() == "Segmentation":
+            self.CheckBox_crop.setCheckState(0)
+            self.CheckBox_segmentation.setCheckState(2)
 
 
 if __name__ == '__main__':
