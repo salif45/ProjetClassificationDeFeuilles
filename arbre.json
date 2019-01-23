@@ -13,7 +13,8 @@
 	"dent": false,
 	"convexe": false,
 	"pointu" : false, 
-	"epaisseur" : 1
+	"epaisseur" : 1,
+	"angleLobe" : 1
 	},
 "bouleau": {
 	"dent": true,
@@ -29,7 +30,8 @@
 	"dent": true,
 	"convexe": false,
 	"pointu" : true,
-	"epaisseur" : 2
+	"epaisseur" : 2,
+	"angleLobe" : 1
 	},
 "margousier": {
 	"dent": true,
@@ -51,4 +53,4 @@
 	"ellipse" : true,
 	"epaisseur" : 0
 	}
-}    
+} 

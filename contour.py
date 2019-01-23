@@ -9,52 +9,50 @@ def dist(A,B):
     return output
 
 def calcAngle(a,b,c):
+    angle = 180
     #normalisation des vecteurs
     vecBA = np.array([a[0] - b[0], a[1] - b[1]])
-    vecBA = vecBA / np.linalg.norm(vecBA)
     vecBC = np.array([c[0] - b[0], c[1] - b[1]])
-    vecBC = vecBC / np.linalg.norm(vecBC)
+    if np.linalg.norm(vecBA) != 0 and np.linalg.norm(vecBC) != 0:
+        vecBA = vecBA / np.linalg.norm(vecBA)
+        vecBC = vecBC / np.linalg.norm(vecBC)
     # calcul de l'angle entre les vecteurs
-    angle = np.arccos(np.dot(vecBA, vecBC)) * 180 / pi
+        angle = np.arccos(np.dot(vecBA, vecBC)) * 180 / pi
     return angle
 
 def detection_dent(contourUtile, imageDeBase, debug = False ):
     imageContour = imageDeBase.copy();
-
+    nb_angle = 0
     list_contour = [] #pour stocker les points qui sont consideres comme des dents
     #on parcourt tous les points du contour et on regarde s'ils sont a peu pres alignes
     #si l'angle entre les points est trop important on considere qu'il y a une dent
     #On regarde si les points sont alignes en utilisant l'inegalite triangulaire (aligne si AB+BC = AC)
-    for i in range(len(contourUtile) - 2):
-        a = contourUtile[i]
-        b = contourUtile[i + 1]
-        c = contourUtile[i + 2]
-        AB = np.linalg.norm(b - a)
-        BC = np.linalg.norm(c - b)
-        AC = np.linalg.norm(c - a)
-        if ((AC / (AB + BC)) < 0.926): #valeur determiner par l'experience : seuil a partir duquel on considere que les points ne sont pas alignes
-            list_contour.append(b)
+    for i in range(len(contourUtile) - 6):
+        a = contourUtile[i][0]
+        b = contourUtile[i + 3][0]
+        c = contourUtile[i + 6][0]
 
-            # nombre de dents
-            nombreDent = len(list_contour)
+        angle = calcAngle(a, b, c)
+        if angle < 90 :
+            nb_angle +=1
+
 
     #Affichage des dents
-
-    cv2.drawContours(imageContour, contourUtile, -1, (0, 0, 255), 3)
     if debug == True :
-        cv2.imshow("dents de la feuille", imageContour)
-        print("Nombre de dents detectees : {}".format(nombreDent))
+        print("nb angle = {}".format(nb_angle))
 
 
     #On fait un seuil a partir duquel on considere qu'il y a des dents
     presenceDent = False
-    if nombreDent > 20 :
+    if nb_angle > 12 :
         presenceDent=True
-    return presenceDent, imageContour
+    return presenceDent
 
 
 def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
     convex, pointu = False, False
+    angleLobe = 1
+    petit_angle = 0
     #On recupere les defauts de convexite de notre contour
     defects = cv2.convexityDefects(contourUtile, hull)
     defautDetecte = 0
@@ -82,29 +80,32 @@ def feuille_convexe(contourUtile, hull, imageDeBase, debug = False):
 
 
 
-        if ((angle <120) and (d1>25 and d2>25)):
+        if ((angle <120) and (d1>30 and d2>30)):
             defautDetecte += 1
+            if angle<80 :
+                petit_angle += 1
             #On regarde la forme de la pointe
-            if (s!=len(contourUtile)-1) : #eviter list index out of range
-                anglePointe = calcAngle(contourUtile[s - 1][0], contourUtile[s][0], contourUtile[s + 1][0])
-                if anglePointe<105:
+            if (s!=len(contourUtile)-3) and (s>=2): #eviter list index out of range
+                anglePointe = calcAngle(contourUtile[s - 3][0], contourUtile[s][0], contourUtile[s + 3][0])
+                if anglePointe<100:
                     pointeDetecte+=1
             if debug == True :
-                cv2.circle(imageDeBase, start, 5, [0, 0, 255], -1) #pointe selectionnee
-                cv2.circle(imageDeBase, tuple(contourUtile[s-1][0]), 4, [255, 0, 255], -1)
-                cv2.circle(imageDeBase, tuple(contourUtile[s+1][0]), 4, [255, 0, 255], -1)
+                # cv2.circle(imageDeBase, start, 5, [0, 0, 255], -1) #pointe selectionnee
+                # cv2.circle(imageDeBase, tuple(contourUtile[s-1][0]), 4, [255, 0, 255], -1)
+                # cv2.circle(imageDeBase, tuple(contourUtile[s+1][0]), 4, [255, 0, 255], -1)
                 print("anglePointe = {}".format(anglePointe))
 
 
-    if defautDetecte <= 4:
+    if defautDetecte <= 2:
         convex = True
     if (convex==False and pointeDetecte>=3):
         pointu = True
-
+    if petit_angle >= 3 :
+        angleLobe=0
     if debug == True :
         cv2.imshow('feuille entiere', imageDeBase)
 
-    return convex, pointu
+    return convex, pointu, angleLobe
 
 #Fonction pour determiner le masque de la feuille sans la queue afin de determiner la forme
 def masqueSansQueue(segmentation):
@@ -543,7 +544,6 @@ def checkEllipse(pointGrandAxe1, pointGrandAxe2, contourUtile, input, debug = Fa
         ellipse = True
 
     rapportEpaisseur = q / p
-    print("!!!!!!!!!!!!!!!!!!!!!!!!", q/p)
     if rapportEpaisseur < 0.3 :
         epaisseur = 0
     elif (rapportEpaisseur>=0.3 and rapportEpaisseur<0.6):
@@ -567,25 +567,26 @@ def redimension(imageDeBase):
     return newInput
 
 
-def segmentation(input): #TODO : mettre la bonne segmentation
+def segmentation(input):
+
     image_gray = cv2.cvtColor(input, cv2.COLOR_RGB2GRAY)
 
     ret, thresh1 = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     kernel = np.ones((3, 3), np.uint8)
-    opening = cv2.morphologyEx(thresh1, cv2.MORPH_OPEN, kernel, iterations=2)
-
-    ret, thresh1 = cv2.threshold(opening, 127, 255, 0)
+    # opening = cv2.morphologyEx(thresh1, cv2.MORPH_OPEN, kernel, iterations=2)
+    #
+    # ret, thresh1 = cv2.threshold(opening, 127, 255, 0)
 
     ## Pour eviter de recalculer les contours regulierement :
     thresh2 = copy.deepcopy(thresh1)
-    _, contours, hierarchy = cv2.findContours(thresh2, 1, cv2.CHAIN_APPROX_TC89_KCOS)
+    _, contours, hierarchy = cv2.findContours(thresh2, 1, cv2.CHAIN_APPROX_SIMPLE) #TC89_KCOS
     contourUtileBase = max(contours, key=len)
     contourConvexBase = cv2.convexHull(contourUtileBase, returnPoints=False)
 
     return thresh1, contourUtileBase, contourConvexBase
 
 
-def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, jsonPath):
+def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, angle, jsonPath):
     # ouverture du fichier JSON et mise sous forme de dictionnaire
     with open(jsonPath) as json_data:
         data_dict = json.load(json_data)
@@ -620,14 +621,19 @@ def etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, 
             else :
                 if (cle2[0] == "pointu" and cle2[1] == pointu):
                     nbrPositif += 1
+                if (cle2[0] == "angleLobe" and cle2[1] == angle):
+                    nbrPositif += 1
 
         listeResultat.append((espece, float(nbrPositif) / float(nbrAttribus) * 100))
-    listeResultat = sorted(listeResultat, key=lambda colonnes: colonnes[1], reverse= True)
-    indexMax = 0
+    compteur_sup_75 = 0
     for i in range(len(listeResultat)):
-        if listeResultat[i][1]>=50:
-            indexMax = i
-    listeResultat = listeResultat[0:indexMax+1]
+        if listeResultat[i][1]>= 75 :
+            compteur_sup_75 += 1
+    if compteur_sup_75>0 :
+        listeResultat = sorted(listeResultat, key=lambda colonnes: colonnes[1], reverse= True)
+    else :
+        listeResultat = []
+
     return listeResultat
 
 
@@ -646,15 +652,13 @@ def analyse(input):
     # input = redimension(input)
     input = cv2.imread(input)
     thresh11, contourUtileBase, contourConvexBase = segmentation(input)
-    teste = thresh11
-    print (type(teste))
-    print (type(thresh11))
+
 
     #Retirer la queue et avoir un masque utilisable pour determiner la forme
     masquethresh, contourUtileMasque, contourConvexMasque, centreMasque = masqueSansQueue(thresh11)
 
     # detection convexite :
-    convexite, pointu = feuille_convexe(contourUtileBase, contourConvexBase, input)
+    convexite, pointu, angleLobe = feuille_convexe(contourUtileBase, contourConvexBase, input)
     # print("feuille entiere : {} | pointu = {}".format(convexite, pointu))
 
     #TODO : regarde la largeur des feuilles : pour difference le margousier et le bouleau
@@ -677,16 +681,15 @@ def analyse(input):
     # print("Forme ellipse : {}".format(ellipse))
     # print("largeur : {}".format(epaisseur))
     #detection dent :
-    dents, imageContour = detection_dent(contourUtileBase, input)
+    dents = detection_dent(contourUtileBase, input)
     # print("presence de dent : {}".format(dents))
 
 
-    input = None
+    print("convexite : {}, pointu : {}, dents : {}, triangle : {}, cercle : {}, rectangle : {}, carre : {}, ellipse : {}, epaisseur : {}, angleLobe : {}".format(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, angleLobe))
 
 
-    listeResultat = etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, 'arbre.json')
-    print(listeResultat)
-    cv2.imwrite("image_to_analyse.bmp", imageContour)
+    listeResultat = etude_classificateur(convexite, pointu, dents, triangle, cercle, rectangle, carre, ellipse, epaisseur, angleLobe, 'arbre.json')
+
     return listeResultat
 #
 # input = cv2.imread("image_to_analyse.bmp")

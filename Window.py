@@ -8,7 +8,7 @@ import os
 import cv2
 import glob
 import contour
-import distance_transform
+import segmentation
 
 
 
@@ -179,7 +179,8 @@ class Example(QMainWindow):
         width = pixmap.width()
         LARGEUR = 500
         facteur = float(LARGEUR) / float(width)
-
+        if (height*facteur)>700:
+            facteur = 700 / float(height)
         pixmap = pixmap.scaled(width*facteur, height*facteur)
         height = pixmap.height()
         width = pixmap.width()
@@ -189,6 +190,7 @@ class Example(QMainWindow):
         self.lbl_down.resize(width, height)
         self.lbl_down.setPixmap(pixmap)
         self.setGeometry(100, 100, width, height)
+        self.lbl_top.setText("Rogner, Segmenter puis Analyser")
         self.show()
 
     def addImage(self):
@@ -384,7 +386,6 @@ class Example(QMainWindow):
 
         if self.CheckBox_segmentation.checkState() == 2:
             if self.LPen == 0:
-                print("test")
                 x = e.x() - 10
                 y = e.y() - 33
                 pic = self.lbl_down.pixmap()
@@ -460,6 +461,8 @@ class Example(QMainWindow):
 
             LARGEUR = 500
             facteur = float(LARGEUR) / float(abs(width))
+            if (height * facteur) > 700:
+                facteur = 700 / float(height)
             pixmap = copy.scaled(abs(width) * facteur, abs(height) * facteur)
             height = pixmap.height()
             width = pixmap.width()
@@ -581,7 +584,6 @@ class Example(QMainWindow):
         Image = self.currentImage.toImage()
         if os.path.isfile("image_to_segment.bmp"):
             os.remove("image_to_segment.bmp")
-            print("removed")
         Image.save("image_to_segment.bmp", quality=100)
         width = self.endColor[0] - self.beginColor[0]
         height = self.endColor[1] - self.beginColor[1]
@@ -592,34 +594,25 @@ class Example(QMainWindow):
             self.beginColor[1] = self.endColor[1]
             height = abs(height)
 
-        image, thresh = distance_transform.ImgToSegmentate("image_to_segment.bmp", self.beginColor, width, height, self.outside)
+        image, thresh = segmentation.ImgToSegmentate("image_to_segment.bmp", self.beginColor, width, height, self.outside)
         cv2.imwrite("image_to_analyse.bmp",thresh)
         cv2.imwrite("im.bmp",image)
         pixmap = QPixmap("im.bmp")
         self.currentImage = pixmap
         self.printImage()
-        print("coucou")
-        # print("out", self.outside)
-        # print("begin crop", self.begin)
-        # print(self.end)
-        # print("begin inside",self.beginColor)
-        # print(self.endColor)
+
         self.outside = []
         self.begin = [-1,-1]
         self.end = [-1,-1]
 
     def Analyse(self):
-        # contour.main()
-        # Image = self.currentImage.toImage()
-        # if os. path. isfile("image_to_analyse.bmp"):
-        #     os.remove("image_to_analyse.bmp")
-        #     print("removed")
-        # Image.save("image_to_analyse.bmp", quality=100)
-        # im = cv2.imread('image_to_analyse.bmp')
+
         listResult = contour.analyse("image_to_analyse.bmp")
-        self.currentImage = QPixmap("image_to_analyse.bmp")
-        self.printImage
-        self.lbl_top.setText("Resultat : {} ({}%) ou {} ({}%)".format(listResult[0][0],listResult[0][1], listResult[1][0], listResult[1][1]))
+
+        if len(listResult)>0 :
+            self.lbl_top.setText("Resultat : {} ({}%) ou {} ({}%)".format(listResult[0][0],listResult[0][1], listResult[1][0], listResult[1][1]))
+        else :
+            self.lbl_top.setText("Autre")
         Image = None
 
     def Restart(self):
