@@ -131,7 +131,7 @@ class Example(QMainWindow):
 
         self.setCentralWidget(self.CentralWidget)
         self.setGeometry(100, 100, 300, 200)
-        self.setWindowTitle('Tooltips')
+        self.setWindowTitle('Leaf Detector')
         self.show()
 
     def showDialog(self):

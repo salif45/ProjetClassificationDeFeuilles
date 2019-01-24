@@ -11,7 +11,7 @@ def build_filters():
         if theta == 0 or theta == np.pi/2 or theta == np.pi:
             pass
         else:
-            kern = cv2.getGaborKernel((ksize, ksize), 3.0, theta, 10.0, 0.5, 0, ktype=cv2.CV_32F)
+            kern = cv2.getGaborKernel((ksize, ksize), 4.0, theta, 10.0, 0.5, 0, ktype=cv2.CV_32F)
             kern /= 1.5 * kern.sum()
             filters.append(kern)
     return filters
@@ -56,31 +56,50 @@ def ImgToSegmentate(image_path, LeftCoordinate, height_mask, width_mask, borders
                                            cv2.GC_INIT_WITH_MASK | cv2.GC_INIT_WITH_RECT)
     mask = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
     image = image * mask[:, :, np.newaxis]
+    # cv2.imshow("Premier Plan", image)
     # Color treatement
     for i in range(0, height):
         for j in range(0, width):
             green = image[i, j, 1]
             blue = image[i, j, 0]
             red = image[i, j, 2]
-            if (blue >= 230 and green >= 230 and red >= 230):
+            if (blue >= 210 and green >= 210 and red >= 210):
                 image[i, j, 0] = 0
                 image[i, j, 1] = 0
                 image[i, j, 2] = 0
 
-
-    image_contour = copy.deepcopy(image)
-    filters = build_filters()
-    res1 = process(image_contour, filters)
+    # cv2.imshow("traitement blanc",image)
+    # image_contour = copy.deepcopy(image)
+    image_contour2 = copy.deepcopy(image)
+    # filters = build_filters()
+    # res1 = process(image_contour, filters)
     # cv2.imshow("Gabor", res1)
-    image_gray = cv2.cvtColor(res1, cv2.COLOR_BGR2GRAY)
-    # cv2.imshow("Gabor_GRAy", image_gray)
-    ret, thresh = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # image_gray = cv2.cvtColor(res1, cv2.COLOR_BGR2GRAY)
+    # cv2.imshow("Gabor_gris", image_gray)
+    #
+    # ret, thresh = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    #
+    # _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # contourUtile = max(contours, key=len)
+    #
+    # for i in range(len(contourUtile)):
+    #     # cv2.circle(image_contour, tuple(contourUtile[i][0]), 2, [255, 0, 255], 3)
+    #     cv2.line(image_contour, tuple(contourUtile[i - 1][0]), tuple(contourUtile[i][0]), [255, 255, 0], 2)
+    #
+    # cv2.imshow("contour AG", image_contour)
 
+    # cv2.imshow("SGabor", image_contour2)
+    image_gray = cv2.cvtColor(image_contour2, cv2.COLOR_BGR2GRAY)
+    # cv2.imshow("SGabor_gris", image_gray)
+
+    ret, thresh = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # cv2.imshow("thresh", thresh)
     _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contourUtile = max(contours, key=len)
 
     for i in range(len(contourUtile)):
         #cv2.circle(image_contour, tuple(contourUtile[i][0]), 2, [255, 0, 255], 3)
-        cv2.line(image_contour, tuple(contourUtile[i-1][0]), tuple(contourUtile[i][0]), [255, 255, 0], 2)
-    cv2.imshow("contour", image_contour)
+        cv2.line(image_contour2, tuple(contourUtile[i-1][0]), tuple(contourUtile[i][0]), [255, 255, 0], 2)
+
+    cv2.imshow("contour", image_contour2)
     return image, thresh
